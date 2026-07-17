@@ -1,32 +1,24 @@
 import { useState, useEffect, useCallback } from 'react';
 import './Popup.css';
-import type { BlockWord, FilterRule, FilterField } from 'x-manage-lib-block';
+import type { BlockWord } from 'x-manage-lib-block';
 import {
   getBlockWords,
-  getFilterRule,
   addBlockWord,
   removeBlockWord,
   toggleBlockWord,
-  setFilterRule,
   exportBlockWords,
   importBlockWords,
 } from '../storage';
 
 export default function () {
   const [words, setWords] = useState<BlockWord[]>([]);
-  const [filterRule, setFilterRuleState] = useState<FilterRule>({ field: 'all', caseSensitive: false });
   const [inputValue, setInputValue] = useState('');
-  const [activeTab, setActiveTab] = useState<'words' | 'filter' | 'io'>('words');
+  const [activeTab, setActiveTab] = useState<'words' | 'io'>('words');
   const [exportText, setExportText] = useState('');
   const [importText, setImportText] = useState('');
 
   const loadData = useCallback(async () => {
-    const [loadedWords, loadedRule] = await Promise.all([
-      getBlockWords(),
-      getFilterRule(),
-    ]);
-    setWords(loadedWords);
-    setFilterRuleState(loadedRule);
+    setWords(await getBlockWords());
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
@@ -49,18 +41,6 @@ export default function () {
     loadData();
   }, [loadData]);
 
-  const handleFilterChange = useCallback(async (field: FilterField) => {
-    const newRule = { ...filterRule, field };
-    setFilterRuleState(newRule);
-    await setFilterRule(newRule);
-  }, [filterRule]);
-
-  const handleCaseSensitiveChange = useCallback(async (caseSensitive: boolean) => {
-    const newRule = { ...filterRule, caseSensitive };
-    setFilterRuleState(newRule);
-    await setFilterRule(newRule);
-  }, [filterRule]);
-
   const handleExport = useCallback(async () => {
     const json = await exportBlockWords();
     setExportText(json);
@@ -77,6 +57,12 @@ export default function () {
     loadData();
   }, [importText, loadData]);
 
+  const FIELD_SHORT: Record<string, string> = {
+    both: '正文+名',
+    body: '正文',
+    author: '显示名',
+  };
+
   return (
     <div className="popup-container">
       <header className="popup-header">
@@ -87,13 +73,13 @@ export default function () {
       </header>
 
       <div className="popup-tabs">
-        {(['words', 'filter', 'io'] as const).map(tab => (
+        {(['words', 'io'] as const).map(tab => (
           <button
             key={tab}
             className={`popup-tab${activeTab === tab ? ' active' : ''}`}
             onClick={() => setActiveTab(tab)}
           >
-            {{ words: '屏蔽词', filter: '规则', io: '导入/导出' }[tab]}
+            {{ words: '屏蔽词', io: '导入/导出' }[tab]}
           </button>
         ))}
       </div>
@@ -122,31 +108,13 @@ export default function () {
                     <span className="popup-toggle-slider" />
                   </label>
                   <span className="popup-word">{w.word}</span>
+                  <span className="popup-field-badge">{FIELD_SHORT[w.matchField || 'both']}</span>
+                  {w.caseSensitive && <span className="popup-field-badge">Aa</span>}
                   <button className="popup-btn popup-btn-danger popup-btn-sm" onClick={() => handleRemove(w.id)}>×</button>
                 </div>
               ))
             )}
           </div>
-        </div>
-      )}
-
-      {activeTab === 'filter' && (
-        <div className="popup-section">
-          <label className="popup-label">匹配字段</label>
-          <select
-            className="popup-select"
-            value={filterRule.field}
-            onChange={e => handleFilterChange(e.target.value as FilterField)}
-          >
-            <option value="all">所有内容</option>
-            <option value="content">推文正文</option>
-            <option value="author">作者名称</option>
-          </select>
-
-          <label className="popup-checkbox" style={{ marginTop: 12 }}>
-            <input type="checkbox" checked={filterRule.caseSensitive} onChange={e => handleCaseSensitiveChange(e.target.checked)} />
-            区分大小写
-          </label>
         </div>
       )}
 

@@ -1,29 +1,31 @@
 import { escapeHtml, getTweetText, getTweetAuthor, getTweetAuthorHandle, getTweetId } from 'x-manage-share'
-import type { BlockWord, FilterRule } from './types'
+import type { BlockWord } from './types'
 
-/** 屏蔽词模块内部使用的属性/类名（不与任何其他模块共享） */
 const ATTR_BLOCKED = 'data-x-manage-blocked'
 const ATTR_LEVEL = 'data-x-manage-level'
 const ATTR_BLOCK_WORD = 'data-x-manage-word'
+const ATTR_BLOCK_FIELD = 'data-x-manage-field'
 const CLASS_BANNER = 'x-manage-banner'
 const CLASS_COLLAPSE = 'x-manage-collapse'
 const CLASS_EXPAND_HINT = 'x-manage-expand-hint'
 const CLASS_PROCESSED = 'x-manage-processed'
 
-/** 判断一段文本是否匹配某个屏蔽词 */
-function matchesFilter(text: string, word: BlockWord, rule: FilterRule): boolean {
+const FIELD_LABEL: Record<string, string> = {
+  body: '匹配正文',
+  author: '匹配显示名',
+}
+
+function matchesFilter(text: string, word: BlockWord): boolean {
   if (!word.enabled) return false
-  const searchText = rule.caseSensitive ? text : text.toLowerCase()
-  const searchWord = rule.caseSensitive ? word.word : word.word.toLowerCase()
+  const searchText = word.caseSensitive ? text : text.toLowerCase()
+  const searchWord = word.caseSensitive ? word.word : word.word.toLowerCase()
   return searchText.includes(searchWord)
 }
 
-/** 获取推文容器（article 的第一个子元素） */
 function getContentContainer(article: HTMLElement): HTMLElement | null {
   return article.firstElementChild as HTMLElement | null
 }
 
-/** 获取容器中非屏蔽词模块注入的"原始内容"子元素 */
 function getContentChildren(container: HTMLElement): HTMLElement[] {
   const blockUI = [CLASS_BANNER, CLASS_COLLAPSE, CLASS_EXPAND_HINT]
   return Array.from(container.children).filter(
@@ -31,7 +33,6 @@ function getContentChildren(container: HTMLElement): HTMLElement[] {
   ) as HTMLElement[]
 }
 
-/** 设置推文的展开级别：0=隐藏、1=半透明、2=完全可见 */
 function setLevel(article: HTMLElement, level: number): void {
   article.setAttribute(ATTR_LEVEL, String(level))
   const container = getContentContainer(article)
@@ -84,16 +85,18 @@ function setLevel(article: HTMLElement, level: number): void {
   }
 }
 
-/** 屏蔽一条推文：注入 banner / expand-hint / collapse */
-function blockTweet(article: HTMLElement, matchedWord: string): void {
+function blockTweet(article: HTMLElement, matchedWord: string, matchedField: string): void {
   article.setAttribute(ATTR_BLOCKED, 'true')
   article.setAttribute(ATTR_BLOCK_WORD, matchedWord)
+  article.setAttribute(ATTR_BLOCK_FIELD, matchedField)
   article.classList.add(CLASS_PROCESSED)
   article.style.position = 'relative'
 
+  const fieldInfo = FIELD_LABEL[matchedField] || ''
+
   const banner = document.createElement('div')
   banner.className = CLASS_BANNER
-  banner.innerHTML = `<span class="x-manage-banner-icon">⊘</span><span class="x-manage-banner-text">因屏蔽词 "<strong>${escapeHtml(matchedWord)}</strong>" 而隐藏</span><span class="x-manage-banner-hint">点击展开</span>`
+  banner.innerHTML = `<span class="x-manage-banner-icon">⊘</span><span class="x-manage-banner-text">因屏蔽词 "<strong>${escapeHtml(matchedWord)}</strong>"${fieldInfo ? `（${fieldInfo}）` : ''}而隐藏</span><span class="x-manage-banner-hint">点击展开</span>`
   banner.addEventListener('click', (e) => {
     e.stopPropagation(); e.preventDefault()
     const currentLevel = parseInt(article.getAttribute(ATTR_LEVEL) || '0', 10)
@@ -106,7 +109,7 @@ function blockTweet(article: HTMLElement, matchedWord: string): void {
 
   const expandHint = document.createElement('div')
   expandHint.className = CLASS_EXPAND_HINT
-  expandHint.innerHTML = `因屏蔽词 "<strong>${escapeHtml(matchedWord)}</strong>" 隐藏 · <span class="x-manage-expand-action">展开 →</span>`
+  expandHint.innerHTML = `因屏蔽词 "<strong>${escapeHtml(matchedWord)}</strong>"${fieldInfo ? `（${fieldInfo}）` : ''}隐藏 · <span class="x-manage-expand-action">展开 →</span>`
   expandHint.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); setLevel(article, 2) })
   if (rootContent) rootContent.appendChild(expandHint)
   else article.appendChild(expandHint)
@@ -114,11 +117,11 @@ function blockTweet(article: HTMLElement, matchedWord: string): void {
   setLevel(article, 0)
 }
 
-/** 取消屏蔽一条推文：移除所有注入元素 + 重置样式 */
 function unblockTweet(article: HTMLElement): void {
   article.removeAttribute(ATTR_BLOCKED)
   article.removeAttribute(ATTR_LEVEL)
   article.removeAttribute(ATTR_BLOCK_WORD)
+  article.removeAttribute(ATTR_BLOCK_FIELD)
   article.classList.remove(CLASS_PROCESSED)
   const b = article.querySelector(`.${CLASS_BANNER}`); if (b) b.remove()
   const c = article.querySelector(`.${CLASS_COLLAPSE}`); if (c) c.remove()
@@ -134,33 +137,37 @@ function unblockTweet(article: HTMLElement): void {
   article.style.padding = ''; article.style.minHeight = ''
 }
 
-/** 检查一条推文是否匹配任何屏蔽词 */
-function checkTweetAgainstBlockWords(article: HTMLElement, words: BlockWord[], rule: FilterRule): string | null {
+type MatchResult = { word: string; field: string } | null
+
+function checkTweetAgainstBlockWords(article: HTMLElement, words: BlockWord[]): MatchResult {
   if (article.getAttribute(ATTR_BLOCKED) === 'true') {
     const existingWord = article.getAttribute(ATTR_BLOCK_WORD)
+    const existingField = article.getAttribute(ATTR_BLOCK_FIELD)
     const stillBlocked = words.some(w => w.word.toLowerCase() === existingWord?.toLowerCase() && w.enabled)
     if (!stillBlocked) return null
-    return existingWord
+    return existingWord && existingField ? { word: existingWord, field: existingField } : null
   }
-  let textToCheck = ''
-  switch (rule.field) {
-    case 'content': textToCheck = getTweetText(article); break
-    case 'author': textToCheck = getTweetAuthor(article); break
-    default: textToCheck = `${getTweetText(article)} ${getTweetAuthor(article)}`
+  for (const word of words) {
+    if (!word.enabled) continue
+    const field = word.matchField
+    if (field === 'body' || field === 'both') {
+      if (matchesFilter(getTweetText(article), word)) return { word: word.word, field: 'body' }
+    }
+    if (field === 'author' || field === 'both') {
+      if (matchesFilter(getTweetAuthor(article), word)) return { word: word.word, field: 'author' }
+    }
   }
-  for (const word of words) if (matchesFilter(textToCheck, word, rule)) return word.word
   return null
 }
 
-/** 处理当前页面上所有推文：屏蔽匹配的 / 取消屏蔽不再匹配的 */
-export function processNewTweets(words: BlockWord[], rule: FilterRule): void {
+export function processNewTweets(words: BlockWord[]): void {
   const articles = document.querySelectorAll<HTMLElement>('article[data-testid="tweet"]')
   articles.forEach((article) => {
     if (article.getAttribute(ATTR_BLOCKED) === 'true') {
-      if (!checkTweetAgainstBlockWords(article, words, rule)) unblockTweet(article)
+      if (!checkTweetAgainstBlockWords(article, words)) unblockTweet(article)
     } else {
-      const matchedWord = checkTweetAgainstBlockWords(article, words, rule)
-      if (matchedWord) blockTweet(article, matchedWord)
+      const match = checkTweetAgainstBlockWords(article, words)
+      if (match) blockTweet(article, match.word, match.field)
     }
   })
 }

@@ -23,9 +23,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
-  "dependencies": {
-    "idb": "^8.0.3"
-  },
+
   "devDependencies": {
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

@@ -5,7 +5,7 @@ const STORAGE_KEYS = {
   FILTER_RULE: 'x_manage_filter_rule',
 }
 
-const DEFAULT_FILTER_RULE: FilterRule = { field: 'all', caseSensitive: false }
+const DEFAULT_FILTER_RULE: FilterRule = { caseSensitive: false }
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 10)
@@ -17,7 +17,7 @@ export async function getBlockWords(): Promise<BlockWord[]> {
 }
 
 export async function setBlockWords(words: BlockWord[]): Promise<void> {
-  GM_setValue(STORAGE_KEYS.BLOCK_WORDS, JSON.stringify(words))
+  try { GM_setValue(STORAGE_KEYS.BLOCK_WORDS, JSON.stringify(words)) } catch (err) { console.error('x-manage setBlockWords error:', err) }
 }
 
 export async function addBlockWord(word: string): Promise<{ words: BlockWord[]; added: boolean }> {
@@ -25,7 +25,7 @@ export async function addBlockWord(word: string): Promise<{ words: BlockWord[]; 
   if (words.some(w => w.word.toLowerCase() === word.toLowerCase())) {
     return { words, added: false }
   }
-  const newWord: BlockWord = { id: generateId(), word, enabled: true, createdAt: Date.now() }
+  const newWord: BlockWord = { id: generateId(), word, enabled: true, matchField: 'both', caseSensitive: false, createdAt: Date.now() }
   words.push(newWord)
   await setBlockWords(words)
   return { words, added: true }
@@ -50,7 +50,7 @@ export async function getFilterRule(): Promise<FilterRule> {
 }
 
 export async function setFilterRule(rule: FilterRule): Promise<void> {
-  GM_setValue(STORAGE_KEYS.FILTER_RULE, JSON.stringify(rule))
+  try { GM_setValue(STORAGE_KEYS.FILTER_RULE, JSON.stringify(rule)) } catch (err) { console.error('x-manage setFilterRule error:', err) }
 }
 
 export async function exportBlockWords(): Promise<string> {
@@ -68,7 +68,7 @@ export async function getFabPosition(): Promise<{ top: number; left: number } | 
 }
 
 export async function setFabPosition(pos: { top: number; left: number }): Promise<void> {
-  GM_setValue(FAB_POS_KEY, JSON.stringify(pos))
+  try { GM_setValue(FAB_POS_KEY, JSON.stringify(pos)) } catch (err) { console.error('x-manage setFabPosition error:', err) }
 }
 
 export async function getNotionConfig(): Promise<{ apiKey: string; databaseId: string } | null> {
@@ -77,7 +77,7 @@ export async function getNotionConfig(): Promise<{ apiKey: string; databaseId: s
 }
 
 export async function setNotionConfig(config: { apiKey: string; databaseId: string }): Promise<void> {
-  GM_setValue(NOTION_CONFIG_KEY, JSON.stringify(config))
+  try { GM_setValue(NOTION_CONFIG_KEY, JSON.stringify(config)) } catch (err) { console.error('x-manage setNotionConfig error:', err) }
 }
 
 export async function getXLinkConfig(): Promise<{ enabled: boolean; mode: 'iframe' | 'new-window' }> {
@@ -86,7 +86,7 @@ export async function getXLinkConfig(): Promise<{ enabled: boolean; mode: 'ifram
 }
 
 export async function setXLinkConfig(config: { enabled: boolean; mode: 'iframe' | 'new-window' }): Promise<void> {
-  GM_setValue(XLINK_CONFIG_KEY, JSON.stringify(config))
+  try { GM_setValue(XLINK_CONFIG_KEY, JSON.stringify(config)) } catch (err) { console.error('x-manage setXLinkConfig error:', err) }
 }
 
 export async function importBlockWords(jsonStr: string): Promise<{ success: boolean; count: number; error?: string }> {
@@ -98,7 +98,7 @@ export async function importBlockWords(jsonStr: string): Promise<{ success: bool
     let added = 0
     for (const item of data.words) {
       if (item.word && !existing.has(item.word.toLowerCase())) {
-        current.push({ id: generateId(), word: item.word, enabled: item.enabled !== false, createdAt: Date.now() })
+        current.push({ id: generateId(), word: item.word, enabled: item.enabled !== false, matchField: item.matchField || 'both', caseSensitive: item.caseSensitive ?? false, createdAt: Date.now() })
         existing.add(item.word.toLowerCase())
         added++
       }
