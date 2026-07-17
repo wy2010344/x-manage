@@ -1,5 +1,5 @@
 import browser from 'webextension-polyfill';
-import type { BlockWord, FilterRule, FilterField } from 'x-manage-lib-block';
+import type { BlockWord, FilterRule } from 'x-manage-lib-block';
 
 const STORAGE_KEYS = {
   BLOCK_WORDS: 'x_manage_block_words',
@@ -7,7 +7,6 @@ const STORAGE_KEYS = {
 };
 
 const DEFAULT_FILTER_RULE: FilterRule = {
-  field: 'all',
   caseSensitive: false,
 };
 
@@ -16,12 +15,14 @@ function generateId(): string {
 }
 
 export async function getBlockWords(): Promise<BlockWord[]> {
-  const result = await browser.storage.local.get(STORAGE_KEYS.BLOCK_WORDS);
-  return result[STORAGE_KEYS.BLOCK_WORDS] || [];
+  try {
+    const result = await browser.storage.local.get(STORAGE_KEYS.BLOCK_WORDS);
+    return result[STORAGE_KEYS.BLOCK_WORDS] || [];
+  } catch { return [] }
 }
 
 export async function setBlockWords(words: BlockWord[]): Promise<void> {
-  await browser.storage.local.set({ [STORAGE_KEYS.BLOCK_WORDS]: words });
+  try { await browser.storage.local.set({ [STORAGE_KEYS.BLOCK_WORDS]: words }) } catch (err) { console.error('x-manage setBlockWords error:', err) }
 }
 
 export async function addBlockWord(word: string): Promise<{ words: BlockWord[]; added: boolean }> {
@@ -33,6 +34,8 @@ export async function addBlockWord(word: string): Promise<{ words: BlockWord[]; 
     id: generateId(),
     word,
     enabled: true,
+    matchField: 'both',
+    caseSensitive: false,
     createdAt: Date.now(),
   };
   words.push(newWord);
@@ -57,23 +60,26 @@ export async function toggleBlockWord(id: string): Promise<BlockWord[]> {
   return words;
 }
 
-export async function updateBlockWord(id: string, word: string): Promise<BlockWord[]> {
+export async function updateBlockWord(id: string, updates: Partial<Pick<BlockWord, 'word' | 'matchField'>>): Promise<BlockWord[]> {
   const words = await getBlockWords();
   const target = words.find(w => w.id === id);
   if (target) {
-    target.word = word;
+    if (updates.word !== undefined) target.word = updates.word;
+    if (updates.matchField !== undefined) target.matchField = updates.matchField;
     await setBlockWords(words);
   }
   return words;
 }
 
 export async function getFilterRule(): Promise<FilterRule> {
-  const result = await browser.storage.local.get(STORAGE_KEYS.FILTER_RULE);
-  return result[STORAGE_KEYS.FILTER_RULE] || DEFAULT_FILTER_RULE;
+  try {
+    const result = await browser.storage.local.get(STORAGE_KEYS.FILTER_RULE);
+    return result[STORAGE_KEYS.FILTER_RULE] || DEFAULT_FILTER_RULE;
+  } catch { return DEFAULT_FILTER_RULE }
 }
 
 export async function setFilterRule(rule: FilterRule): Promise<void> {
-  await browser.storage.local.set({ [STORAGE_KEYS.FILTER_RULE]: rule });
+  try { await browser.storage.local.set({ [STORAGE_KEYS.FILTER_RULE]: rule }) } catch (err) { console.error('x-manage setFilterRule error:', err) }
 }
 
 export async function exportBlockWords(): Promise<string> {
@@ -101,6 +107,8 @@ export async function importBlockWords(jsonStr: string): Promise<{ success: bool
           id: generateId(),
           word: item.word,
           enabled: item.enabled !== false,
+          matchField: item.matchField || 'both',
+          caseSensitive: item.caseSensitive ?? false,
           createdAt: Date.now(),
         });
         currentWordSet.add(item.word.toLowerCase());
@@ -117,33 +125,39 @@ export async function importBlockWords(jsonStr: string): Promise<{ success: bool
 const FAB_POS_KEY = 'x_manage_fab_position'
 const XLINK_CONFIG_KEY = 'x_manage_xlink_config'
 
+const NOTION_CONFIG_KEY = 'x_manage_notion_config'
+
 export async function getFabPosition(): Promise<{ top: number; left: number } | null> {
-  const result = await browser.storage.local.get(FAB_POS_KEY);
-  return result[FAB_POS_KEY] || null;
+  try {
+    const result = await browser.storage.local.get(FAB_POS_KEY);
+    return result[FAB_POS_KEY] || null;
+  } catch { return null }
 }
 
 export async function setFabPosition(pos: { top: number; left: number }): Promise<void> {
-  await browser.storage.local.set({ [FAB_POS_KEY]: pos });
+  try { await browser.storage.local.set({ [FAB_POS_KEY]: pos }) } catch (err) { console.error('x-manage setFabPosition error:', err) }
 }
 
 export async function getXLinkConfig(): Promise<{ enabled: boolean; mode: 'iframe' | 'new-window' }> {
-  const result = await browser.storage.local.get(XLINK_CONFIG_KEY);
-  return result[XLINK_CONFIG_KEY] || { enabled: true, mode: 'iframe' };
+  try {
+    const result = await browser.storage.local.get(XLINK_CONFIG_KEY);
+    return result[XLINK_CONFIG_KEY] || { enabled: true, mode: 'iframe' };
+  } catch { return { enabled: true, mode: 'iframe' } }
 }
 
 export async function setXLinkConfig(config: { enabled: boolean; mode: 'iframe' | 'new-window' }): Promise<void> {
-  await browser.storage.local.set({ [XLINK_CONFIG_KEY]: config });
+  try { await browser.storage.local.set({ [XLINK_CONFIG_KEY]: config }) } catch (err) { console.error('x-manage setXLinkConfig error:', err) }
 }
 
-const NOTION_CONFIG_KEY = 'x_manage_notion_config'
-
 export async function getNotionConfig(): Promise<{ apiKey: string; databaseId: string } | null> {
-  const result = await browser.storage.local.get(NOTION_CONFIG_KEY);
-  return result[NOTION_CONFIG_KEY] || null;
+  try {
+    const result = await browser.storage.local.get(NOTION_CONFIG_KEY);
+    return result[NOTION_CONFIG_KEY] || null;
+  } catch { return null }
 }
 
 export async function setNotionConfig(config: { apiKey: string; databaseId: string }): Promise<void> {
-  await browser.storage.local.set({ [NOTION_CONFIG_KEY]: config });
+  try { await browser.storage.local.set({ [NOTION_CONFIG_KEY]: config }) } catch (err) { console.error('x-manage setNotionConfig error:', err) }
 }
 
 export function onWordsChanged(callback: () => void): () => void {

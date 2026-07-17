@@ -1,23 +1,41 @@
 import ReactDOM from 'react-dom/client'
 import { STYLES } from 'x-manage-share'
-import { BlockFeature, processNewTweets, BLOCK_STYLES } from 'x-manage-lib-block'
-import { TagFeature, ensureTagButtons, updateTweetTags, TAG_STYLES, getAllTags } from 'x-manage-lib-tag'
-import { XLinkFeature, XLINK_STYLES } from 'x-manage-lib-xlink'
+import {
+  BlockFeature,
+  processNewTweets,
+  BLOCK_STYLES,
+} from 'x-manage-lib-block'
+import {
+  TagFeature,
+  ensureTagButtons,
+  updateTweetTags,
+  TAG_STYLES,
+  getAllTags,
+} from 'x-manage-lib-tag'
+// import { XLinkFeature, XLINK_STYLES } from 'x-manage-lib-xlink'
 import * as storage from './storage'
 
 // 注入所有样式
-GM_addStyle(STYLES + BLOCK_STYLES + TAG_STYLES + XLINK_STYLES)
+GM_addStyle(STYLES + BLOCK_STYLES + TAG_STYLES)
 
-// 处理当前页面上所有推文
+// 处理当前页面上所有推文（防重入：storage/IndexedDB 读写期间不重复执行）
+let processing = false
 async function processAll() {
-  const [words, rule, tags] = await Promise.all([
-    storage.getBlockWords(),
-    storage.getFilterRule(),
-    getAllTags(),
-  ])
-  processNewTweets(words, rule)
-  ensureTagButtons()
-  updateTweetTags(tags)
+  if (processing) return
+  processing = true
+  try {
+    const [words, tags] = await Promise.all([
+      storage.getBlockWords(),
+      getAllTags(),
+    ])
+    processNewTweets(words)
+    ensureTagButtons()
+    updateTweetTags(tags)
+  } catch (err) {
+    console.error('x-manage processAll error:', err)
+  } finally {
+    processing = false
+  }
 }
 
 function init() {
@@ -29,8 +47,8 @@ function init() {
     <>
       <BlockFeature storage={storage} />
       <TagFeature storage={storage} />
-      <XLinkFeature storage={storage} />
-    </>
+      {/* <XLinkFeature storage={storage} /> */}
+    </>,
   )
 
   let timeout: ReturnType<typeof setTimeout>

@@ -12,7 +12,16 @@ export function getTweetText(article: HTMLElement): string {
   return article.textContent || ''
 }
 
+
 export function getTweetAuthor(article: HTMLElement): string {
+  const userName = article.querySelector<HTMLElement>('[data-testid="User-Name"]')
+  if (userName) {
+    const spans = userName.querySelectorAll('span')
+    for (const span of spans) {
+      const t = span.textContent?.trim()
+      if (t && !t.startsWith('@')) return t
+    }
+  }
   const links = article.querySelectorAll<HTMLAnchorElement>('a[role="link"]')
   for (const link of links) { const href = link.getAttribute('href') || ''; if (/^\/[^/]+$/.test(href) && !href.includes('status')) return link.textContent?.trim() || '' }
   return ''

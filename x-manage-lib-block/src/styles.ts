@@ -43,8 +43,21 @@ export const BLOCK_STYLES = `
 }
 .x-manage-word-item:hover { background: rgba(255, 255, 255, 0.06) !important; border-color: rgba(255, 255, 255, 0.06) !important; }
 .x-manage-word-item.disabled { opacity: 0.45 !important; }
-.x-manage-word-text { flex: 1 !important; font-size: 14px !important; font-weight: 500 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+.x-manage-word-text { flex: 1 !important; min-width: 0 !important; font-size: 14px !important; font-weight: 500 !important; overflow-wrap: break-word !important; white-space: pre-wrap !important; }
 .x-manage-word-actions { display: flex !important; gap: 4px !important; align-items: center !important; flex-shrink: 0 !important; }
+
+.x-manage-field-dropdown { position: relative !important; flex-shrink: 0 !important; }
+.x-manage-field-trigger { display: flex !important; align-items: center !important; gap: 2px !important; font-size: 11px !important; color: #a4b0be !important; background: rgba(255,255,255,0.05) !important; border: 1px solid rgba(255,255,255,0.08) !important; border-radius: 4px !important; padding: 2px 6px !important; cursor: pointer !important; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important; white-space: nowrap !important; transition: all 0.15s ease !important; line-height: 1.3 !important; }
+.x-manage-field-trigger:hover { background: rgba(255,255,255,0.1) !important; border-color: rgba(255,255,255,0.15) !important; color: #c8d6e5 !important; }
+.x-manage-field-arrow { font-size: 8px !important; opacity: 0.5 !important; }
+.x-manage-field-menu { min-width: 100px !important; background: #1e1e32 !important; border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 6px !important; box-shadow: 0 8px 24px rgba(0,0,0,0.3) !important; overflow: hidden !important; }
+.x-manage-field-option { padding: 6px 10px !important; font-size: 12px !important; color: #a4b0be !important; cursor: pointer !important; transition: all 0.12s ease !important; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important; }
+.x-manage-field-option:hover { background: rgba(108, 92, 231, 0.12) !important; color: #c8d6e5 !important; }
+.x-manage-field-option.active { color: #c8d6e5 !important; background: rgba(108, 92, 231, 0.15) !important; font-weight: 600 !important; }
+
+.x-manage-case-btn { display: inline-flex !important; align-items: center !important; justify-content: center !important; width: 24px !important; height: 20px !important; font-size: 10px !important; font-weight: 700 !important; color: rgba(164, 176, 190, 0.3) !important; background: transparent !important; border: none !important; border-radius: 3px !important; padding: 0 !important; cursor: pointer !important; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important; transition: all 0.15s ease !important; line-height: 1 !important; flex-shrink: 0 !important; }
+.x-manage-case-btn:hover { color: rgba(164, 176, 190, 0.6) !important; background: rgba(255,255,255,0.04) !important; }
+.x-manage-case-btn.active { color: #6c5ce7 !important; }
 
 .x-manage-toggle { position: relative !important; width: 40px !important; height: 22px !important; flex-shrink: 0 !important; }
 .x-manage-toggle input { opacity: 0 !important; width: 0 !important; height: 0 !important; position: absolute !important; }

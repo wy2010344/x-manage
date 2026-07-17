@@ -10,16 +10,24 @@ const styleEl = document.createElement('style')
 styleEl.textContent = STYLES + BLOCK_STYLES + TAG_STYLES + XLINK_STYLES
 document.head.appendChild(styleEl)
 
-// 处理当前页面上所有推文
+// 处理当前页面上所有推文（防重入：storage/IndexedDB 读写期间不重复执行）
+let processing = false
 async function processAll() {
-  const [words, rule, tags] = await Promise.all([
-    storage.getBlockWords(),
-    storage.getFilterRule(),
-    getAllTags(),
-  ])
-  processNewTweets(words, rule)
-  ensureTagButtons()
-  updateTweetTags(tags)
+  if (processing) return
+  processing = true
+  try {
+    const [words, tags] = await Promise.all([
+      storage.getBlockWords(),
+      getAllTags(),
+    ])
+    processNewTweets(words)
+    ensureTagButtons()
+    updateTweetTags(tags)
+  } catch (err) {
+    console.error('x-manage processAll error:', err)
+  } finally {
+    processing = false
+  }
 }
 
 function init() {

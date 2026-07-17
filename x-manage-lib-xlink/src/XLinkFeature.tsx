@@ -55,13 +55,13 @@ export function XLinkFeature({ storage }: Props) {
   }, [])
 
   useEffect(() => {
-    let destroyXLink: (() => void) | undefined
+    const destroyRef: { current?: () => void } = {}
     storage.getXLinkConfig().then(c => {
       setConfig(c)
-      destroyXLink = initXLink(c)
-    })
-    storage.getFabPosition().then(p => { if (p) setFabPos(p) })
-    return () => { if (destroyXLink) destroyXLink() }
+      destroyRef.current = initXLink(c)
+    }).catch(() => {})
+    storage.getFabPosition().then(p => { if (p) setFabPos(p) }).catch(() => {})
+    return () => { destroyRef.current?.() }
   }, [storage])
 
   const toggleEnabled = async () => {

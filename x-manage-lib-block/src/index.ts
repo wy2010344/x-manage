@@ -1,7 +1,7 @@
-export type { BlockWord, FilterField, FilterRule, BlockStorage } from './types'
+export type { BlockWord, FilterRule, BlockStorage } from './types'
 export { processNewTweets } from './block'
 export { BlockFeature } from './BlockFeature'
 export { BlockWordsPanel } from './BlockWordsPanel'
-export { FilterPanel } from './FilterPanel'
+/** @deprecated FilterPanel 已移除，匹配字段改为每词独立配置 */
 export { IoPanel } from './IoPanel'
 export { BLOCK_STYLES } from './styles'

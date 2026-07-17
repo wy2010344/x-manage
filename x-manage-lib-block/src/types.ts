@@ -2,14 +2,13 @@ export interface BlockWord {
   id: string;
   word: string;
   enabled: boolean;
+  matchField: 'both' | 'body' | 'author';
+  caseSensitive: boolean;
   createdAt: number;
 }
 
-export type FilterField = 'all' | 'content' | 'author';
-
 export interface FilterRule {
-  field: FilterField;
-  caseSensitive: boolean;
+  // 保留空接口以保持向后兼容
 }
 
 export interface BlockStorage {

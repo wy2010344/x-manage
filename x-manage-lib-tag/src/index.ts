@@ -1,7 +1,7 @@
 export type { TweetTag, NotionConfig, TagStorage } from './types'
 export { getAllTags, addTag, importTags, updateTag, deleteTag, deleteAllTags, getTagsByAuthor } from './tagStore'
 export { verifyNotionToken, verifyNotionDatabase, pullTagsFromNotion, pushTagsToNotion } from './notionSync'
-export { ensureTagButtons, updateTweetTags } from './tag'
+export { ensureTagButtons, updateTweetTags, setTagButtonSelector } from './tag'
 export { TagFeature } from './TagFeature'
 export { TagPanel } from './TagPanel'
 export { TagDialog } from './TagDialog'
