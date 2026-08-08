@@ -1,3 +1,7 @@
+/**
+ * 链接拦截模块专属样式——iframe 弹窗。
+ * 颜色使用 x-manage-share 定义的 CSS 变量（--xm-*），自动适配亮/暗主题。
+ */
 export const XLINK_STYLES = `
 .x-manage-xlink-backdrop {
   position: fixed !important;
@@ -30,14 +34,14 @@ export const XLINK_STYLES = `
   align-items: center !important;
   justify-content: space-between !important;
   padding: 10px 16px !important;
-  background: #1a1a2e !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: var(--xm-bg) !important;
+  border-bottom: 1px solid var(--xm-divider) !important;
   flex-shrink: 0 !important;
 }
 
 .x-manage-xlink-url {
   font-size: 12px !important;
-  color: #a4b0be !important;
+  color: var(--xm-text-secondary) !important;
   font-family: "SF Mono", "Fira Code", monospace !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
@@ -72,12 +76,12 @@ export const XLINK_STYLES = `
 }
 
 .x-manage-xlink-btn-close {
-  background: rgba(255, 255, 255, 0.06) !important;
-  color: #a4b0be !important;
+  background: var(--xm-surface) !important;
+  color: var(--xm-text-secondary) !important;
 }
 .x-manage-xlink-btn-close:hover {
-  background: rgba(255, 255, 255, 0.1) !important;
-  color: #f1f2f6 !important;
+  background: var(--xm-surface-hover) !important;
+  color: var(--xm-text) !important;
 }
 
 .x-manage-xlink-iframe {
