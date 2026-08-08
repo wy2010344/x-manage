@@ -4,5 +4,6 @@ export { verifyNotionToken, verifyNotionDatabase, pullTagsFromNotion, pushTagsTo
 export { ensureTagButtons, updateTweetTags, setTagButtonSelector } from './tag'
 export { TagFeature } from './TagFeature'
 export { TagPanel } from './TagPanel'
+export { NotionPanel } from './NotionPanel'
 export { TagDialog } from './TagDialog'
 export { TAG_STYLES } from './styles'

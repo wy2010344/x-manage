@@ -64,18 +64,14 @@ export function BlockFeature({ storage }: Props) {
       {showModal && (
         <div className="x-manage-modal-backdrop" onClick={() => setShowModal(false)}>
           <div className="x-manage-modal" onClick={e => e.stopPropagation()}>
-            <div className="x-manage-modal-header">
-              <h2>屏蔽词管理</h2>
+            <div className="x-manage-modal-header" style={{ padding: '12px 16px' }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <button className={`x-manage-btn x-manage-btn-sm ${tab === 'block' ? 'x-manage-btn-primary' : 'x-manage-btn-secondary'}`} onClick={() => setTab('block')}>屏蔽词</button>
+                <button className={`x-manage-btn x-manage-btn-sm ${tab === 'io' ? 'x-manage-btn-primary' : 'x-manage-btn-secondary'}`} onClick={() => setTab('io')}>导入/导出</button>
+              </div>
               <button className="x-manage-modal-close" onClick={() => setShowModal(false)}>✕</button>
             </div>
             <div className="x-manage-modal-body">
-              <div className="x-manage-tabs">
-                {['block', 'io'].map(t => (
-                  <button key={t} className={`x-manage-tab${tab === t ? ' active' : ''}`} onClick={() => setTab(t)}>
-                    {{ block: '屏蔽词', io: '导入/导出' }[t]}
-                  </button>
-                ))}
-              </div>
               {tab === 'block' && (
                 <BlockWordsPanel
                   words={words}
