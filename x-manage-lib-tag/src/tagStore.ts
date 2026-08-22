@@ -6,6 +6,9 @@ const STORE = 'tags'
 
 let dbPromise: Promise<IDBPDatabase> | null = null
 
+// 全量标签内存缓存：DOM 变更触发的高频读取不再每次走 IndexedDB，写操作后失效
+let cache: TweetTag[] | null = null
+
 function getDb() {
   if (!dbPromise) {
     dbPromise = openDB(DB_NAME, 1, {
@@ -20,8 +23,14 @@ function getDb() {
 }
 
 export async function getAllTags(): Promise<TweetTag[]> {
+  if (cache) return cache
   const db = await getDb()
-  return db.getAll(STORE)
+  cache = await db.getAll(STORE)
+  return cache
+}
+
+function invalidate(): void {
+  cache = null
 }
 
 export async function getTagsByAuthor(authorHandle: string): Promise<TweetTag[]> {
@@ -32,6 +41,7 @@ export async function getTagsByAuthor(authorHandle: string): Promise<TweetTag[]>
 export async function addTag(tag: TweetTag): Promise<void> {
   const db = await getDb()
   await db.add(STORE, tag)
+  invalidate()
 }
 
 export async function updateTag(id: string, data: Partial<Omit<TweetTag, 'id' | 'createdAt'>>): Promise<void> {
@@ -39,16 +49,19 @@ export async function updateTag(id: string, data: Partial<Omit<TweetTag, 'id' | 
   const existing = await db.get(STORE, id)
   if (!existing) return
   await db.put(STORE, { ...existing, ...data, updatedAt: Date.now() })
+  invalidate()
 }
 
 export async function deleteTag(id: string): Promise<void> {
   const db = await getDb()
   await db.delete(STORE, id)
+  invalidate()
 }
 
 export async function deleteAllTags(): Promise<void> {
   const db = await getDb()
   await db.clear(STORE)
+  invalidate()
 }
 
 export async function importTags(tags: TweetTag[]): Promise<number> {
@@ -63,5 +76,6 @@ export async function importTags(tags: TweetTag[]): Promise<number> {
     }
   }
   await tx.done
+  invalidate()
   return count
 }
