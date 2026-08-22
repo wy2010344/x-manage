@@ -1,5 +1,5 @@
 import ReactDOM from 'react-dom/client'
-import { STYLES } from 'x-manage-share'
+import { STYLES, isSelfMutationBatch } from 'x-manage-share'
 import { BlockFeature, processNewTweets, BLOCK_STYLES } from 'x-manage-lib-block'
 import { TagFeature, ensureTagButtons, updateTweetTags, TAG_STYLES, getAllTags } from 'x-manage-lib-tag'
 import { XLinkFeature, XLINK_STYLES } from 'x-manage-lib-xlink'
@@ -10,19 +10,25 @@ const styleEl = document.createElement('style')
 styleEl.textContent = STYLES + BLOCK_STYLES + TAG_STYLES + XLINK_STYLES
 document.head.appendChild(styleEl)
 
-// 处理当前页面上所有推文（防重入：storage/IndexedDB 读写期间不重复执行）
+// 处理当前页面上所有推文（防重入：storage/IndexedDB 读写期间不重复执行；
+// 期间若有新的 DOM 变更，置 pendingRun 标记，本轮结束后立即补跑一次）
 let processing = false
+let pendingRun = false
 async function processAll() {
-  if (processing) return
+  if (processing) { pendingRun = true; return }
   processing = true
   try {
-    const [words, tags] = await Promise.all([
-      storage.getBlockWords(),
-      getAllTags(),
-    ])
-    processNewTweets(words)
-    ensureTagButtons()
-    updateTweetTags(tags)
+    while (true) {
+      pendingRun = false
+      const [words, tags] = await Promise.all([
+        storage.getBlockWords(),
+        getAllTags(),
+      ])
+      processNewTweets(words)
+      ensureTagButtons()
+      updateTweetTags(tags)
+      if (!pendingRun) break
+    }
   } catch (err) {
     console.error('x-manage processAll error:', err)
   } finally {
@@ -44,10 +50,15 @@ function init() {
   )
 
   let timeout: ReturnType<typeof setTimeout>
-  new MutationObserver(() => {
+  new MutationObserver((mutations) => {
+    // 插件自身 UI（banner/标签行/按钮等）产生的变更不触发重扫，避免空转与抖动
+    if (isSelfMutationBatch(mutations)) return
     clearTimeout(timeout)
     timeout = setTimeout(processAll, 500)
   }).observe(document.body, { childList: true, subtree: true })
+
+  // 弹窗里增删/启停屏蔽词后立即重扫当前页面，不必等下一次 X DOM 变更
+  storage.onWordsChanged(() => { processAll() })
 
   processAll()
 }

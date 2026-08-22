@@ -72,13 +72,21 @@ export function ensureTagButtons(): void {
 }
 
 export function updateTweetTags(tags: TweetTag[]): void {
+  // 预建 authorHandle → tags 索引，避免每条推文都对全量标签做 filter
+  const byHandle = new Map<string, TweetTag[]>()
+  for (const t of tags) {
+    const key = t.authorHandle.toLowerCase()
+    const list = byHandle.get(key)
+    if (list) list.push(t)
+    else byHandle.set(key, [t])
+  }
   const articles = document.querySelectorAll<HTMLElement>('article[data-testid="tweet"]')
   articles.forEach((article) => {
     const handle = getTweetAuthorHandle(article)
     if (!handle) return
     const anchor = findTagRowAnchor(article)
     if (!anchor) return
-    const authorTags = tags.filter(t => t.authorHandle.toLowerCase() === handle.toLowerCase())
+    const authorTags = byHandle.get(handle.toLowerCase()) || []
     const existingContainer = anchor.parentElement?.querySelector<HTMLElement>(`:scope > .${CLASS_TAG_ROW} > .${CLASS_TAGS}`)
     const existingChips = existingContainer ? Array.from(existingContainer.querySelectorAll('.x-manage-tag-chip')) : []
     if (authorTags.length > 0 && existingChips.length === authorTags.length) {
