@@ -1,14 +1,14 @@
 import ReactDOM from 'react-dom/client'
-import { STYLES, isSelfMutationBatch } from 'x-manage-share'
-import { BlockFeature, processNewTweets, BLOCK_STYLES } from 'x-manage-lib-block'
-import { TagFeature, ensureTagButtons, updateTweetTags, TAG_STYLES, getAllTags } from 'x-manage-lib-tag'
-import { FavFeature, ensureFavButtons, updateFavButtonStates, FAV_STYLES, getAllFavs } from 'x-manage-lib-fav'
-import { XLinkFeature, XLINK_STYLES } from 'x-manage-lib-xlink'
+import { STYLES, ControlCenter, isSelfMutationBatch } from 'x-manage-share'
+import { BlockSettingsPanel, processNewTweets, BLOCK_STYLES } from 'x-manage-lib-block'
+import { TagFeature, TagSettingsPanel, ensureTagButtons, updateTweetTags, TAG_STYLES, getAllTags } from 'x-manage-lib-tag'
+import { FavSettingsPanel, ensureFavButtons, updateFavButtonStates, FAV_STYLES, getAllFavs } from 'x-manage-lib-fav'
+// import { XLinkFeature, XLINK_STYLES } from 'x-manage-lib-xlink'
 import * as storage from './storage'
 
 // 注入所有样式
 const styleEl = document.createElement('style')
-styleEl.textContent = STYLES + BLOCK_STYLES + TAG_STYLES + FAV_STYLES + XLINK_STYLES
+styleEl.textContent = STYLES + BLOCK_STYLES + TAG_STYLES + FAV_STYLES
 document.head.appendChild(styleEl)
 
 // 处理当前页面上所有推文（防重入：storage/IndexedDB 读写期间不重复执行；
@@ -47,10 +47,16 @@ function init() {
   const root = ReactDOM.createRoot(container)
   root.render(
     <>
-      <BlockFeature storage={storage} />
+      <ControlCenter
+        storage={storage}
+        sections={[
+          { key: 'block', label: '屏蔽词', render: <BlockSettingsPanel storage={storage} /> },
+          { key: 'fav', label: '收藏', render: <FavSettingsPanel storage={storage} /> },
+          { key: 'tag', label: '标签', render: <TagSettingsPanel storage={storage} /> },
+        ]}
+      />
       <TagFeature storage={storage} />
-      <FavFeature storage={storage} />
-      <XLinkFeature storage={storage} />
+      {/* XLink 暂未纳入控制中心，待后续作为顶级 tab 集成 */}
     </>
   )
 

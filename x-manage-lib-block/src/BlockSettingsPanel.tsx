@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Fab, Toast } from 'x-manage-share'
+import { Toast } from 'x-manage-share'
 import type { BlockWord, BlockStorage } from './types'
 import { BlockWordsPanel } from './BlockWordsPanel'
 import { IoPanel } from './IoPanel'
@@ -8,11 +8,13 @@ interface Props {
   storage: BlockStorage
 }
 
-export function BlockFeature({ storage }: Props) {
-  const [showModal, setShowModal] = useState(false)
+/**
+ * 屏蔽词设置面板——控制中心「屏蔽词」tab 的内容。
+ * 子 tab：屏蔽词列表 / 导入导出。
+ */
+export function BlockSettingsPanel({ storage }: Props) {
   const [tab, setTab] = useState('block')
   const [words, setWords] = useState<BlockWord[]>([])
-  const [fabPos, setFabPos] = useState({ top: 100, left: 16 })
   const [toast, setToast] = useState<string | null>(null)
   const [exportText, setExportText] = useState('')
   const [importText, setImportText] = useState('')
@@ -23,8 +25,7 @@ export function BlockFeature({ storage }: Props) {
   }, [])
 
   useEffect(() => {
-    storage.getFabPosition().then(p => { if (p) setFabPos(p) })
-    storage.getBlockWords().then(setWords)
+    storage.getBlockWords().then(setWords).catch(() => {})
   }, [storage])
 
   const handleAdd = async (word: string) => {
@@ -59,34 +60,22 @@ export function BlockFeature({ storage }: Props) {
 
   return (
     <>
-      <Fab defaultPos={fabPos} onPosChange={p => { setFabPos(p); storage.setFabPosition(p) }} onClick={() => setShowModal(true)} />
       <Toast message={toast} />
-      {showModal && (
-        <div className="x-manage-modal-backdrop" onClick={() => setShowModal(false)}>
-          <div className="x-manage-modal" onClick={e => e.stopPropagation()}>
-            <div className="x-manage-modal-header" style={{ padding: '12px 16px' }}>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <button className={`x-manage-btn x-manage-btn-sm ${tab === 'block' ? 'x-manage-btn-primary' : 'x-manage-btn-secondary'}`} onClick={() => setTab('block')}>屏蔽词</button>
-                <button className={`x-manage-btn x-manage-btn-sm ${tab === 'io' ? 'x-manage-btn-primary' : 'x-manage-btn-secondary'}`} onClick={() => setTab('io')}>导入/导出</button>
-              </div>
-              <button className="x-manage-modal-close" onClick={() => setShowModal(false)}>✕</button>
-            </div>
-            <div className="x-manage-modal-body">
-              {tab === 'block' && (
-                <BlockWordsPanel
-                  words={words}
-                  onAdd={handleAdd}
-                  onRemove={handleRemove}
-                  onToggle={handleToggle}
-                  onMatchFieldChange={handleMatchFieldChange}
-                  onCaseSensitiveChange={handleCaseSensitive}
-                />
-              )}
-              {tab === 'io' && <IoPanel exportText={exportText} importText={importText} onExport={handleExport} onImport={handleImport} onImportTextChange={setImportText} />}
-            </div>
-          </div>
-        </div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <button className={`x-manage-btn x-manage-btn-sm ${tab === 'block' ? 'x-manage-btn-primary' : 'x-manage-btn-secondary'}`} onClick={() => setTab('block')}>屏蔽词</button>
+        <button className={`x-manage-btn x-manage-btn-sm ${tab === 'io' ? 'x-manage-btn-primary' : 'x-manage-btn-secondary'}`} onClick={() => setTab('io')}>导入/导出</button>
+      </div>
+      {tab === 'block' && (
+        <BlockWordsPanel
+          words={words}
+          onAdd={handleAdd}
+          onRemove={handleRemove}
+          onToggle={handleToggle}
+          onMatchFieldChange={handleMatchFieldChange}
+          onCaseSensitiveChange={handleCaseSensitive}
+        />
       )}
+      {tab === 'io' && <IoPanel exportText={exportText} importText={importText} onExport={handleExport} onImport={handleImport} onImportTextChange={setImportText} />}
     </>
   )
 }

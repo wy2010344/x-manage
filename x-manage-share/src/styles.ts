@@ -193,4 +193,51 @@ export const STYLES = `
 .x-manage-modal::-webkit-scrollbar-track, .x-manage-word-list::-webkit-scrollbar-track { background: transparent !important; }
 .x-manage-modal::-webkit-scrollbar-thumb, .x-manage-word-list::-webkit-scrollbar-thumb { background: var(--xm-scrollbar) !important; border-radius: 2px !important; }
 .x-manage-modal::-webkit-scrollbar-thumb:hover, .x-manage-word-list::-webkit-scrollbar-thumb:hover { background: var(--xm-scrollbar-hover) !important; }
+
+.x-manage-hub-backdrop {
+  position: fixed !important; inset: 0 !important; z-index: 2147483646 !important;
+  background: var(--xm-overlay) !important; backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  display: flex !important; align-items: center !important; justify-content: center !important;
+  animation: x-manage-fadeIn 0.2s ease !important;
+}
+.x-manage-hub-dialog {
+  background: var(--xm-bg) !important; border-radius: 16px !important;
+  width: min(600px, calc(100vw - 32px)) !important;
+  max-height: min(680px, calc(100vh - 64px)) !important;
+  display: flex !important; flex-direction: column !important; overflow: hidden !important;
+  box-shadow: 0 24px 80px var(--xm-shadow) !important;
+  border: 1px solid var(--xm-border) !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  color: var(--xm-text) !important;
+  color-scheme: var(--xm-scheme) !important;
+  animation: x-manage-slideUp 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+.x-manage-hub-topbar {
+  display: flex !important; align-items: center !important; gap: 8px !important;
+  padding: 12px 16px !important; border-bottom: 1px solid var(--xm-divider) !important;
+  flex-shrink: 0 !important; background: var(--xm-bg) !important;
+}
+.x-manage-hub-tab {
+  padding: 7px 16px !important; border: none !important; border-radius: 8px !important;
+  background: var(--xm-surface) !important; color: var(--xm-text-secondary) !important;
+  font-size: 13px !important; font-weight: 600 !important; cursor: pointer !important;
+  font-family: inherit !important; transition: all 0.2s ease !important; white-space: nowrap !important;
+}
+.x-manage-hub-tab:hover { background: var(--xm-surface-hover) !important; color: var(--xm-text) !important; }
+.x-manage-hub-tab.active { background: linear-gradient(135deg, #6c5ce7, #a855f7) !important; color: #fff !important; }
+.x-manage-hub-close {
+  margin-left: auto !important; width: 32px !important; height: 32px !important; border-radius: 50% !important;
+  border: none !important; background: var(--xm-surface) !important;
+  color: var(--xm-text-secondary) !important; font-size: 18px !important;
+  cursor: pointer !important; display: flex !important; align-items: center !important; justify-content: center !important;
+  transition: all 0.2s ease !important;
+}
+.x-manage-hub-close:hover { background: var(--xm-surface-hover) !important; color: var(--xm-text) !important; }
+.x-manage-hub-body { flex: 1 !important; min-height: 0 !important; overflow-y: auto !important; padding: 16px !important; }
+.x-manage-hub-pane { min-height: 100% !important; }
+.x-manage-hub-body::-webkit-scrollbar { width: 4px !important; }
+.x-manage-hub-body::-webkit-scrollbar-track { background: transparent !important; }
+.x-manage-hub-body::-webkit-scrollbar-thumb { background: var(--xm-scrollbar) !important; border-radius: 2px !important; }
+.x-manage-hub-body::-webkit-scrollbar-thumb:hover { background: var(--xm-scrollbar-hover) !important; }
 `
