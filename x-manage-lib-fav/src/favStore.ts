@@ -68,6 +68,42 @@ export async function removeFavByTweetId(tweetId: string): Promise<void> {
   if (existing) await removeFav(existing.id)
 }
 
+export interface FavToggleInput {
+  authorHandle: string
+  authorName: string
+  tweetId: string
+  tweetUrl: string
+  tweetText: string
+}
+
+// 串行队列：连点时后续操作基于最新库状态决策，避免"先读后写"竞态产生重复/漏删
+let toggleQueue: Promise<unknown> = Promise.resolve()
+
+/** 翻转某推文的收藏状态，返回操作后是否处于已收藏。 */
+export function toggleFav(input: FavToggleInput): Promise<boolean> {
+  const task = toggleQueue.then(async (): Promise<boolean> => {
+    const existing = await getFavByTweetId(input.tweetId)
+    if (existing) {
+      await removeFav(existing.id)
+      return false
+    }
+    const now = Date.now()
+    await addFav({
+      id: `${input.authorHandle}_${input.tweetId}_${now}`,
+      authorHandle: input.authorHandle,
+      authorName: input.authorName || input.authorHandle.replace('/', ''),
+      tweetId: input.tweetId,
+      tweetText: input.tweetText,
+      tweetUrl: input.tweetUrl,
+      createdAt: now,
+      updatedAt: now,
+    })
+    return true
+  })
+  toggleQueue = task.catch(() => {})
+  return task
+}
+
 export async function deleteAllFavs(): Promise<void> {
   const db = await getDb()
   await db.clear(STORE)
