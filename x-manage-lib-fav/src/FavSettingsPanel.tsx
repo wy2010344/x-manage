@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, type SetStateAction } from 'react'
 import { Toast } from 'x-manage-share'
 import type { FavTweet, FavStorage } from './types'
-import { getAllFavs, removeFavByTweetId, addFav } from './favStore'
+import { getAllFavs, toggleFav } from './favStore'
+import { updateFavButtonStates } from './fav'
 import { FavListPanel } from './FavListPanel'
 import { FavNotionPanel } from './FavNotionPanel'
 
@@ -36,28 +37,21 @@ export function FavSettingsPanel({ storage }: Props) {
   }, [storage])
 
   const handleFavToggle = useCallback(async (detail: FavToggleDetail) => {
-    const existing = await getAllFavs()
-    const found = existing.find(f => f.tweetId === detail.tweetId)
-    if (found) {
-      await removeFavByTweetId(detail.tweetId)
-      setFavs(await getAllFavs())
-      showToast('已取消收藏')
-    } else {
-      const now = Date.now()
-      await addFav({
-        id: `${detail.authorHandle}_${detail.tweetId}_${now}`,
-        authorHandle: detail.authorHandle,
-        authorName: detail.authorName || detail.authorHandle.replace('/', ''),
-        tweetId: detail.tweetId,
-        tweetText: detail.tweetText,
-        tweetUrl: detail.tweetUrl,
-        createdAt: now,
-        updatedAt: now,
-      })
-      setFavs(await getAllFavs())
-      showToast('已收藏到本地')
-    }
+    const favorited = await toggleFav(detail)
+    const favs = await getAllFavs()
+    setFavs(favs)
+    updateFavButtonStates(favs)
+    showToast(favorited ? '已收藏到本地' : '已取消收藏')
   }, [showToast])
+
+  // 收藏列表 / Notion 面板增删后，同步刷新页面上的所有星标按钮
+  const setFavsSync = useCallback((next: SetStateAction<FavTweet[]>) => {
+    setFavs(prev => {
+      const resolved = typeof next === 'function' ? next(prev) : next
+      updateFavButtonStates(resolved)
+      return resolved
+    })
+  }, [])
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -76,9 +70,9 @@ export function FavSettingsPanel({ storage }: Props) {
         <button className={`x-manage-btn x-manage-btn-sm ${tab === 'notion' ? 'x-manage-btn-primary' : 'x-manage-btn-secondary'}`} onClick={() => setTab('notion')}>Notion同步</button>
       </div>
       {tab === 'favs' ? (
-        <FavListPanel favs={favs} setFavs={setFavs} showToast={showToast} />
+        <FavListPanel favs={favs} setFavs={setFavsSync} showToast={showToast} />
       ) : (
-        <FavNotionPanel favs={favs} setFavs={setFavs} showToast={showToast} />
+        <FavNotionPanel favs={favs} setFavs={setFavsSync} showToast={showToast} />
       )}
     </>
   )

@@ -29,6 +29,7 @@ function buildFavButton(): HTMLButtonElement {
   const btn = document.createElement('button')
   btn.className = CLASS_FAV_BTN
   btn.title = '收藏到本地'
+  btn.dataset.filled = 'false'
   btn.innerHTML = starSvg(false)
   btn.addEventListener('click', (e) => {
     e.stopPropagation(); e.preventDefault()
@@ -37,6 +38,11 @@ function buildFavButton(): HTMLButtonElement {
     const handle = getTweetAuthorHandle(article)
     const tweetId = getTweetId(article)
     if (!tweetId) return
+    // 乐观翻转视觉，立即给出点击反馈（不必等 IndexedDB 写入后的全量刷新）
+    const filled = btn.dataset.filled === 'true'
+    btn.dataset.filled = String(!filled)
+    btn.innerHTML = starSvg(!filled)
+    btn.title = filled ? '收藏到本地' : '取消收藏'
     const tweetUrl = handle ? `https://x.com${handle}/status/${tweetId}` : ''
     window.dispatchEvent(new CustomEvent('x-manage-fav-toggle', {
       detail: {
