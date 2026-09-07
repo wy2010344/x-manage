@@ -12,6 +12,7 @@
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "x-manage-lib-block": "workspace:*",
+    "x-manage-lib-fav": "workspace:*",
     "x-manage-lib-tag": "workspace:*",
     "x-manage-lib-xlink": "workspace:*",
     "x-manage-share": "workspace:*"
