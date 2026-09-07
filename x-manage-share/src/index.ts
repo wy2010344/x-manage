@@ -1,4 +1,6 @@
 export * from './utils'
 export * from './styles'
+export type { HubSection, HubStorage } from './components/ControlCenter'
 export { Fab } from './components/Fab'
 export { Toast } from './components/Toast'
+export { ControlCenter } from './components/ControlCenter'

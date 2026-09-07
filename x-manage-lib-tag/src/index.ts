@@ -3,6 +3,7 @@ export { getAllTags, addTag, importTags, updateTag, deleteTag, deleteAllTags, ge
 export { verifyNotionToken, verifyNotionDatabase, pullTagsFromNotion, pushTagsToNotion } from './notionSync'
 export { ensureTagButtons, updateTweetTags, setTagButtonSelector } from './tag'
 export { TagFeature } from './TagFeature'
+export { TagSettingsPanel } from './TagSettingsPanel'
 export { TagPanel } from './TagPanel'
 export { NotionPanel } from './NotionPanel'
 export { TagDialog } from './TagDialog'

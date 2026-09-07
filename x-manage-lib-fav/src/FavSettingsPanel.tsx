@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Fab, Toast } from 'x-manage-share'
+import { Toast } from 'x-manage-share'
 import type { FavTweet, FavStorage } from './types'
 import { getAllFavs, removeFavByTweetId, addFav } from './favStore'
 import { FavListPanel } from './FavListPanel'
@@ -17,12 +17,14 @@ interface FavToggleDetail {
   tweetText: string
 }
 
-export function FavFeature({ storage }: Props) {
+/**
+ * 收藏设置面板——控制中心「收藏」tab 的内容。
+ * 子 tab：收藏列表 / Notion同步。
+ */
+export function FavSettingsPanel({ storage }: Props) {
   const [toast, setToast] = useState<string | null>(null)
-  const [showModal, setShowModal] = useState(false)
   const [tab, setTab] = useState<'favs' | 'notion'>('favs')
   const [favs, setFavs] = useState<FavTweet[]>([])
-  const [fabPos, setFabPos] = useState({ top: 160, left: 16 })
 
   const showToast = useCallback((msg: string) => {
     setToast(msg)
@@ -30,7 +32,6 @@ export function FavFeature({ storage }: Props) {
   }, [])
 
   useEffect(() => {
-    storage.getFabPosition().then(p => { if (p) setFabPos(p) }).catch(() => {})
     getAllFavs().then(setFavs).catch(() => {})
   }, [storage])
 
@@ -39,7 +40,7 @@ export function FavFeature({ storage }: Props) {
     const found = existing.find(f => f.tweetId === detail.tweetId)
     if (found) {
       await removeFavByTweetId(detail.tweetId)
-      setFavs((await getAllFavs()))
+      setFavs(await getAllFavs())
       showToast('已取消收藏')
     } else {
       const now = Date.now()
@@ -53,7 +54,7 @@ export function FavFeature({ storage }: Props) {
         createdAt: now,
         updatedAt: now,
       })
-      setFavs((await getAllFavs()))
+      setFavs(await getAllFavs())
       showToast('已收藏到本地')
     }
   }, [showToast])
@@ -69,27 +70,15 @@ export function FavFeature({ storage }: Props) {
 
   return (
     <>
-      <Fab defaultPos={fabPos} onPosChange={p => { setFabPos(p); storage.setFabPosition(p) }} onClick={() => setShowModal(true)} />
       <Toast message={toast} />
-      {showModal && (
-        <div className="x-manage-tag-dialog-backdrop" onClick={() => setShowModal(false)}>
-          <div className="x-manage-tag-dialog" onClick={e => e.stopPropagation()} style={{ width: 'min(440px, calc(100vw - 32px))' }}>
-            <div className="x-manage-tag-dialog-header">
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                <button className={`x-manage-btn x-manage-btn-sm ${tab === 'favs' ? 'x-manage-btn-primary' : 'x-manage-btn-secondary'}`} onClick={() => setTab('favs')}>收藏列表</button>
-                <button className={`x-manage-btn x-manage-btn-sm ${tab === 'notion' ? 'x-manage-btn-primary' : 'x-manage-btn-secondary'}`} onClick={() => setTab('notion')}>Notion同步</button>
-              </div>
-              <button className="x-manage-tag-dialog-close" onClick={() => setShowModal(false)}>✕</button>
-            </div>
-            <div className="x-manage-tag-dialog-body">
-              {tab === 'favs' ? (
-                <FavListPanel favs={favs} setFavs={setFavs} showToast={showToast} />
-              ) : (
-                <FavNotionPanel favs={favs} setFavs={setFavs} showToast={showToast} />
-              )}
-            </div>
-          </div>
-        </div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <button className={`x-manage-btn x-manage-btn-sm ${tab === 'favs' ? 'x-manage-btn-primary' : 'x-manage-btn-secondary'}`} onClick={() => setTab('favs')}>收藏列表</button>
+        <button className={`x-manage-btn x-manage-btn-sm ${tab === 'notion' ? 'x-manage-btn-primary' : 'x-manage-btn-secondary'}`} onClick={() => setTab('notion')}>Notion同步</button>
+      </div>
+      {tab === 'favs' ? (
+        <FavListPanel favs={favs} setFavs={setFavs} showToast={showToast} />
+      ) : (
+        <FavNotionPanel favs={favs} setFavs={setFavs} showToast={showToast} />
       )}
     </>
   )
