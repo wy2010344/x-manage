@@ -2,12 +2,13 @@ import ReactDOM from 'react-dom/client'
 import { STYLES, isSelfMutationBatch } from 'x-manage-share'
 import { BlockFeature, processNewTweets, BLOCK_STYLES } from 'x-manage-lib-block'
 import { TagFeature, ensureTagButtons, updateTweetTags, TAG_STYLES, getAllTags } from 'x-manage-lib-tag'
+import { FavFeature, ensureFavButtons, updateFavButtonStates, FAV_STYLES, getAllFavs } from 'x-manage-lib-fav'
 import { XLinkFeature, XLINK_STYLES } from 'x-manage-lib-xlink'
 import * as storage from './storage'
 
 // 注入所有样式
 const styleEl = document.createElement('style')
-styleEl.textContent = STYLES + BLOCK_STYLES + TAG_STYLES + XLINK_STYLES
+styleEl.textContent = STYLES + BLOCK_STYLES + TAG_STYLES + FAV_STYLES + XLINK_STYLES
 document.head.appendChild(styleEl)
 
 // 处理当前页面上所有推文（防重入：storage/IndexedDB 读写期间不重复执行；
@@ -20,13 +21,16 @@ async function processAll() {
   try {
     while (true) {
       pendingRun = false
-      const [words, tags] = await Promise.all([
+      const [words, tags, favs] = await Promise.all([
         storage.getBlockWords(),
         getAllTags(),
+        getAllFavs(),
       ])
       processNewTweets(words)
       ensureTagButtons()
       updateTweetTags(tags)
+      ensureFavButtons()
+      updateFavButtonStates(favs)
       if (!pendingRun) break
     }
   } catch (err) {
@@ -45,6 +49,7 @@ function init() {
     <>
       <BlockFeature storage={storage} />
       <TagFeature storage={storage} />
+      <FavFeature storage={storage} />
       <XLinkFeature storage={storage} />
     </>
   )

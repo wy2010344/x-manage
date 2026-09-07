@@ -12,11 +12,18 @@ import {
   TAG_STYLES,
   getAllTags,
 } from 'x-manage-lib-tag'
+import {
+  FavFeature,
+  ensureFavButtons,
+  updateFavButtonStates,
+  FAV_STYLES,
+  getAllFavs,
+} from 'x-manage-lib-fav'
 // import { XLinkFeature, XLINK_STYLES } from 'x-manage-lib-xlink'
 import * as storage from './storage'
 
 // 注入所有样式
-GM_addStyle(STYLES + BLOCK_STYLES + TAG_STYLES)
+GM_addStyle(STYLES + BLOCK_STYLES + TAG_STYLES + FAV_STYLES)
 
 // 处理当前页面上所有推文（防重入：storage/IndexedDB 读写期间不重复执行；
 // 期间若有新的 DOM 变更，置 pendingRun 标记，本轮结束后立即补跑一次）
@@ -28,13 +35,16 @@ async function processAll() {
   try {
     while (true) {
       pendingRun = false
-      const [words, tags] = await Promise.all([
+      const [words, tags, favs] = await Promise.all([
         storage.getBlockWords(),
         getAllTags(),
+        getAllFavs(),
       ])
       processNewTweets(words)
       ensureTagButtons()
       updateTweetTags(tags)
+      ensureFavButtons()
+      updateFavButtonStates(favs)
       if (!pendingRun) break
     }
   } catch (err) {
@@ -53,6 +63,7 @@ function init() {
     <>
       <BlockFeature storage={storage} />
       <TagFeature storage={storage} />
+      <FavFeature storage={storage} />
       {/* <XLinkFeature storage={storage} /> */}
     </>,
   )
