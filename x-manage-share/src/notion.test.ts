@@ -6,6 +6,7 @@ import {
   detectRootPageKind,
   listChildDatabases,
   ensureNotionDatabase,
+  findAuthorRow,
 } from './notion'
 
 const { Client } = vi.hoisted(() => {
@@ -188,6 +189,49 @@ describe('listChildDatabases', () => {
     const r = await listChildDatabases({ tokenOrUrl: PROXY, notionVersion: VER, rootPageId: 'page1' })
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.error).toContain('读取根对象失败')
+  })
+})
+
+describe('findAuthorRow', () => {
+  it('returns the row page id when a matching register row exists (rich_text column)', async () => {
+    ;(Client as any)
+      .prototype.set('databases.retrieve', () => ({ properties: { author: { type: 'rich_text' } } }))
+      .set('databases.query', (args: any) => {
+        expect(args.filter).toEqual({ property: 'author', rich_text: { equals: '/alice' } })
+        return { has_more: false, results: [{ id: 'rowA' }] }
+      })
+    const r = await findAuthorRow({ tokenOrUrl: PROXY, notionVersion: VER, databaseId: 'dbRoot', author: '/alice' })
+    expect(r).toEqual({ ok: true, rowPageId: 'rowA' })
+  })
+
+  it('uses a title column when the database has no text author column candidate', async () => {
+    ;(Client as any)
+      .prototype.set('databases.retrieve', () => ({ properties: { Name: { type: 'title' } } }))
+      .set('databases.query', (args: any) => {
+        expect(args.filter).toEqual({ property: 'Name', title: { equals: '/bob' } })
+        return { has_more: false, results: [{ id: 'rowB' }] }
+      })
+    const r = await findAuthorRow({ tokenOrUrl: PROXY, notionVersion: VER, databaseId: 'dbRoot', author: '/bob' })
+    expect(r).toEqual({ ok: true, rowPageId: 'rowB' })
+  })
+
+  it('returns notFound when the author has no register row and never creates pages', async () => {
+    ;(Client as any)
+      .prototype.set('databases.retrieve', () => ({ properties: { Name: { type: 'title' } } }))
+      .set('databases.query', () => ({ has_more: false, results: [] }))
+    const r = await findAuthorRow({ tokenOrUrl: PROXY, notionVersion: VER, databaseId: 'dbRoot', author: '/nobody' })
+    expect(r).toEqual({ ok: false, notFound: true })
+    // pages.create is not stubbed → any call would throw and fail the test
+  })
+
+  it('surfaces errors as ok:false (read-only failure)', async () => {
+    ;(Client as any).prototype.set('databases.retrieve', () => {
+      const e: any = new Error('boom')
+      throw e
+    })
+    const r = await findAuthorRow({ tokenOrUrl: PROXY, notionVersion: VER, databaseId: 'dbRoot', author: '/alice' })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect((r as any).error).toContain('定位作者失败')
   })
 })
 

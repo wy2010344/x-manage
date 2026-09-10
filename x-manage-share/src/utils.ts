@@ -38,6 +38,35 @@ export function getTweetAuthorHandle(article: HTMLElement): string {
   return ''
 }
 
+/**
+ * 读取当前登录的 X 账号 handle（首页数据库登记账号）。
+ * 依次尝试：侧边栏个人资料入口、导航栏内个人资料链接、账号切换按钮内的 @用户名。
+ * 返回带前导斜杠的 handle（如 `/elonmusk`），读取失败返回 null。
+ * 仅在 x.com 页面上下文可用（content script / user script）。
+ */
+export function getCurrentUserHandle(): string | null {
+  try {
+    const profileLink = document.querySelector<HTMLAnchorElement>('a[data-testid="AppTabBar_Profile_Link"]')
+    if (profileLink) {
+      const href = profileLink.getAttribute('href') || ''
+      if (/^\/[^/?#]+$/.test(href)) return href
+    }
+    const knownPaths = new Set(['/home', '/explore', '/notifications', '/messages', '/compose', '/settings', '/search'])
+    const navLinks = document.querySelectorAll<HTMLAnchorElement>('nav a[href^="/"][role="link"], header a[href^="/"][role="link"]')
+    for (const a of navLinks) {
+      const href = a.getAttribute('href') || ''
+      if (/^\/[^/?#]+$/.test(href) && !knownPaths.has(href)) {
+        const top = href.split('/')[1]
+        if (/^[A-Za-z0-9_]{1,50}$/.test(top)) return `/${top}`
+      }
+    }
+    const switcherBtn = document.querySelector<HTMLElement>('[data-testid="SideNav_AccountSwitcher_Button"]')
+    const atSpan = switcherBtn ? [...switcherBtn.querySelectorAll('span')].map(s => s.textContent || '').find(t => /^@[A-Za-z0-9_]{1,50}$/.test(t)) : ''
+    if (atSpan) return `/${atSpan.slice(1)}`
+  } catch { /* 不在浏览器页面环境时静默失败 */ }
+  return null
+}
+
 export function getTweetId(article: HTMLElement): string {
   const timeLink = article.querySelector<HTMLAnchorElement>('a[href*="/status/"]')
   if (timeLink) { const parts = timeLink.pathname.split('/'); const idx = parts.indexOf('status'); if (idx !== -1 && idx + 1 < parts.length) return parts[idx + 1] }
