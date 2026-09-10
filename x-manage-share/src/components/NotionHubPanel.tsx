@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { listChildDatabases, parseNotionPageId, readLastPushedAt } from '../notion'
+import { listChildDatabases, detectRootPageKind, parseNotionPageId, readLastPushedAt } from '../notion'
 
 export interface NotionSyncModule {
   id: string
@@ -52,7 +52,11 @@ export function NotionHubPanel({ storage, modules, showToast }: Props) {
     if (!/^https?:\/\//i.test(url)) { showToast('代理 URL 需以 http(s):// 开头'); return }
     if (!rootPageId) { showToast('无法解析根页面 ID（请粘贴 Notion 页面链接）'); return }
     setBusyAction('save')
-    const probe = await listChildDatabases({ tokenOrUrl: url, notionVersion: modules[0]?.version || FALLBACK_VERSION, rootPageId })
+    const version = modules[0]?.version || FALLBACK_VERSION
+    const kind = await detectRootPageKind({ tokenOrUrl: url, notionVersion: version, rootPageId })
+    if (kind.error) { showToast(`无法访问根页面：${kind.error}`); setBusyAction(null); return }
+    if (kind.kind === 'database') { showToast('根页面是数据库：Notion 不支持在数据库下自动建子库，请改用普通页面的链接'); setBusyAction(null); return }
+    const probe = await listChildDatabases({ tokenOrUrl: url, notionVersion: version, rootPageId })
     if (!probe.ok) { showToast(`无法访问根页面：${probe.error}`); setBusyAction(null); return }
     await storage.setNotionSetup({ proxyUrl: url, rootPageId })
     showToast('Notion 配置已保存')
