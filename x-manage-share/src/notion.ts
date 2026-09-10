@@ -34,6 +34,48 @@ export function notionErrorMessage(e: unknown, fallback: string): string {
 }
 
 /**
+ * 代理 POST 实现：优先使用油猴 GM_xmlhttpRequest（绕过页面 CSP / 跨域限制），
+ * 回退到浏览器 fetch（Chrome 扩展 content script 需要 host_permissions 覆盖代理域）。
+ * 返回 HTTPS status + 已解析 JSON。fetch 失败或 HTTP 错误由上层统一按错误抛。
+ */
+async function proxyPost(url: string, body: string): Promise<{ status: number; json: any }> {
+  const gm = (globalThis as unknown as { GM_xmlhttpRequest?: (opts: {
+    method: string
+    url: string
+    headers: Record<string, string>
+    data: string
+    onload: (res: { status: number; responseText: string }) => void
+    onerror: (res: { status?: number; error?: string }) => void
+    timeout?: number
+  }) => void }).GM_xmlhttpRequest
+  if (typeof gm === 'function') {
+    return new Promise((resolve, reject) => {
+      gm({
+        method: 'POST',
+        url,
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        data: body,
+        timeout: 30000,
+        onload: res => {
+          let json: any = {}
+          try { json = JSON.parse(res.responseText || '{}') } catch { /* 保持空对象 */ }
+          resolve({ status: res.status, json })
+        },
+        onerror: res => {
+          const err: any = new Error(res?.error || `Network error while reaching proxy (HTTP ${res?.status ?? 0})`)
+          err.status = res?.status || 0
+          err.code = 'network_error'
+          reject(err)
+        },
+      })
+    })
+  }
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8' }, body })
+  const json: any = await res.json().catch(() => ({}))
+  return { status: res.status, json }
+}
+
+/**
  * 创建统一 Notion 客户端：代理 URL 用「SDK + request 覆写」，API Key 用 SDK 默认直连。
  * 业务代码一律通过 SDK 高层 API（databases.query / pages.create / blocks.children.list…）调用，
  * 路径、方法、分页、错误类型全部由官方 SDK 规范化。
@@ -44,12 +86,8 @@ export function createNotionClient(tokenOrUrl: string, notionVersion: string): C
   if (isNotionProxyUrl(tr)) {
     const client = new Client({ notionVersion })
     client.request = (async (data: any) => {
-      const res = await fetch(tr, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json; charset=utf-8' },
-        body: JSON.stringify(data),
-      })
-      const json: any = await res.json().catch(() => ({}))
+      const res = await proxyPost(tr, JSON.stringify(data))
+      const json: any = res.json
       // 代理的错误形态有两种：
       // 1. 透传官方错误体：{ object:'error', code, status, message }
       // 2. chat-note 代理序列化的 SDK APIResponseError：{ name, code, status, body:'{...}' }
@@ -58,10 +96,11 @@ export function createNotionClient(tokenOrUrl: string, notionVersion: string): C
       if (json?.name === 'APIResponseError') {
         try { payload = JSON.parse(json.body ?? '{}') } catch { payload = json }
       }
-      if (!res.ok || payload?.object === 'error') {
+      const failed = res.status === 0 || res.status >= 400 || payload?.object === 'error'
+      if (failed) {
         const err: any = new Error(payload?.message || `Notion request failed (HTTP ${res.status})`)
         err.status = typeof payload?.status === 'number' ? payload.status : res.status
-        err.code = payload?.code || (res.ok ? 'proxy_error' : 'proxy_http_error')
+        err.code = payload?.code || (res.status >= 400 ? 'proxy_http_error' : 'proxy_error')
         err.body = payload
         throw err
       }

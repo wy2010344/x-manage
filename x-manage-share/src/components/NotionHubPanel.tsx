@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { listChildDatabases, detectRootPageKind, searchRootPages, parseNotionPageId, readLastPushedAt } from '../notion'
+import { XMANAGE_VERSION } from '../version'
 
 export interface NotionSyncModule {
   id: string
@@ -100,7 +101,10 @@ export function NotionHubPanel({ storage, modules, showToast }: Props) {
 
   return (
     <div>
-      <div className="x-manage-filter-label" style={{ marginBottom: 8 }}>Notion 同步（全局公共配置）</div>
+      <div className="x-manage-filter-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <span>Notion 同步（全局公共配置）</span>
+        <span style={{ fontSize: 11, color: '#a0a0a0' }}>v{XMANAGE_VERSION}</span>
+      </div>
       <div style={{ fontSize: 11, color: '#636e72', marginBottom: 8, lineHeight: 1.5 }}>
         所有模块共享同一份配置。填入代理 URL 与根页面链接后，各模块（标签/收藏…）会自动在根页面下按作者建库并每 30 分钟增量推送；遇到异常可在下方按模块「从 Notion 恢复」拉取并合并回本地。
         <br />⚠️ 根页面必须是「普通页面」——数据库链接（形如 app.notion.com/p/….?v=…）不可以，Notion 不允许在数据库下建库。可用右上「列出工作区可用页面」直接挑选一个普通页面。

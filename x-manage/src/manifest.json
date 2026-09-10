@@ -22,7 +22,8 @@
   "host_permissions": [
     "https://x.com/*",
     "https://twitter.com/*",
-    "https://mobile.twitter.com/*"
+    "https://mobile.twitter.com/*",
+    "https://vercel.wangyang2010344.space/*"
   ],
   "content_scripts": [
     {

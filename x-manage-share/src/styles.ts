@@ -218,10 +218,6 @@ export const STYLES = `
   padding: 12px 16px !important; border-bottom: 1px solid var(--xm-divider) !important;
   flex-shrink: 0 !important; background: var(--xm-bg) !important;
 }
-.x-manage-hub-version {
-  font-size: 11px !important; color: var(--xm-text-tertiary, var(--xm-text-secondary)) !important;
-  margin-right: 2px !important; white-space: nowrap !important; user-select: none !important;
-}
 .x-manage-hub-tab {
   padding: 7px 16px !important; border: none !important; border-radius: 8px !important;
   background: var(--xm-surface) !important; color: var(--xm-text-secondary) !important;
