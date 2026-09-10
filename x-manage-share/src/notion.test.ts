@@ -4,6 +4,7 @@ import {
   parseNotionPageId,
   createNotionClient,
   detectRootPageKind,
+  searchRootPages,
   listChildDatabases,
   ensureNotionDatabase,
 } from './notion'
@@ -36,6 +37,11 @@ const { Client } = vi.hoisted(() => {
       query: vi.fn(),
     }
     pages = { create: vi.fn(), update: vi.fn() }
+    search = vi.fn(async (args: any) => {
+      const h = handlers.get('search')
+      if (!h) throw new Error('search not stubbed')
+      return h(args)
+    })
     set(route: string, fn: (args: any) => any) {
       handlers.set(route, fn)
       return this
@@ -102,6 +108,23 @@ describe('detectRootPageKind', () => {
       .prototype.set('blocks.retrieve', () => ({ type: 'child_database', id: 'db1' }))
     const r = await detectRootPageKind({ tokenOrUrl: PROXY, notionVersion: VER, rootPageId: 'db1' })
     expect(r).toEqual({ kind: 'database' })
+  })
+})
+
+describe('searchRootPages', () => {
+  it('lists real pages and drops databases', async () => {
+    ;(Client as any).prototype.set('search', () => ({
+      results: [
+        { object: 'page', id: 'pageA', properties: { title: { title: [{ type: 'text', plain_text: '我的页面' }] } } },
+        { object: 'database', id: 'dbX' },
+        { object: 'page', id: 'pageB', properties: { title: { title: [] } } },
+      ],
+    }))
+    const r = await searchRootPages({ tokenOrUrl: PROXY, notionVersion: VER })
+    expect(r).toEqual({ ok: true, pages: [
+      { id: 'pageA', title: '我的页面' },
+      { id: 'pageB', title: '(无标题页面)' },
+    ] })
   })
 })
 

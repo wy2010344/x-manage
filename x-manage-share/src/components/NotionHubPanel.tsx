@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { listChildDatabases, detectRootPageKind, parseNotionPageId, readLastPushedAt } from '../notion'
+import { listChildDatabases, detectRootPageKind, searchRootPages, parseNotionPageId, readLastPushedAt } from '../notion'
 
 export interface NotionSyncModule {
   id: string
@@ -33,6 +33,8 @@ const FALLBACK_VERSION = '2022-06-28'
 export function NotionHubPanel({ storage, modules, showToast }: Props) {
   const [proxyUrl, setProxyUrl] = useState('')
   const [rootPageUrl, setRootPageUrl] = useState('')
+  const [availablePages, setAvailablePages] = useState<{ id: string; title: string }[] | null>(null)
+  const [pageError, setPageError] = useState('')
   const [lastPushed, setLastPushed] = useState<Record<string, number>>({})
   const [busyAction, setBusyAction] = useState<string | null>(null)
 
@@ -44,6 +46,17 @@ export function NotionHubPanel({ storage, modules, showToast }: Props) {
     for (const m of modules) snapshot[m.id] = readLastPushedAt(m.lastPushedKey)
     setLastPushed(snapshot)
   }, [storage, modules])
+
+  const handleListPages = async () => {
+    const url = proxyUrl.trim()
+    if (!url || !/^https?:\/\//i.test(url)) { showToast('请先填写代理 URL'); return }
+    setPageError(''); setAvailablePages(null)
+    const r = await searchRootPages({ tokenOrUrl: url, notionVersion: modules[0]?.version || FALLBACK_VERSION })
+    if (!r.ok) { setPageError(r.error); showToast(`列出页面失败：${r.error}`); return }
+    setAvailablePages(r.pages)
+    if (r.pages.length) setRootPageUrl(r.pages[0].id)
+    showToast(`找到 ${r.pages.length} 个可用普通页面`)
+  }
 
   const handleSave = async () => {
     const url = proxyUrl.trim()
@@ -90,9 +103,24 @@ export function NotionHubPanel({ storage, modules, showToast }: Props) {
       <div className="x-manage-filter-label" style={{ marginBottom: 8 }}>Notion 同步（全局公共配置）</div>
       <div style={{ fontSize: 11, color: '#636e72', marginBottom: 8, lineHeight: 1.5 }}>
         所有模块共享同一份配置。填入代理 URL 与根页面链接后，各模块（标签/收藏…）会自动在根页面下按作者建库并每 30 分钟增量推送；遇到异常可在下方按模块「从 Notion 恢复」拉取并合并回本地。
+        <br />⚠️ 根页面必须是「普通页面」——数据库链接（形如 app.notion.com/p/….?v=…）不可以，Notion 不允许在数据库下建库。可用右上「列出工作区可用页面」直接挑选一个普通页面。
       </div>
       <input className="x-manage-input" type="text" value={proxyUrl} onChange={e => setProxyUrl(e.target.value)} placeholder="代理 URL，如 https://example.com/api/notion" style={{ marginBottom: 6 }} />
-      <input className="x-manage-input" type="text" value={rootPageUrl} onChange={e => setRootPageUrl(e.target.value)} placeholder="根页面：Notion 页面链接或页面 ID" style={{ marginBottom: 8 }} />
+      <input className="x-manage-input" type="text" value={rootPageUrl} onChange={e => setRootPageUrl(e.target.value)} placeholder="根页面：Notion 普通页面链接或页面 ID" style={{ marginBottom: 6 }} />
+      <div className="x-manage-io-buttons" style={{ marginBottom: 8 }}>
+        <button className="x-manage-btn x-manage-btn-sm" onClick={handleListPages} disabled={isBusy()}>列出工作区可用页面</button>
+      </div>
+      {availablePages && (
+        <div style={{ marginBottom: 8, maxHeight: 140, overflowY: 'auto', border: '1px solid #ececec', borderRadius: 6 }}>
+          {availablePages.map(p => (
+            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', fontSize: 12, cursor: 'pointer', background: p.id === (parseNotionPageId(rootPageUrl) ?? '') ? '#f0edff' : 'transparent' }} onClick={() => setRootPageUrl(p.id)}>
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title} · {p.id.slice(0, 13)}…</span>
+              <span style={{ color: '#6c5ce7', fontWeight: 600 }}>选用</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {pageError && <div style={{ fontSize: 11, color: '#e74c3c', marginBottom: 8 }}>{pageError}</div>}
       <div className="x-manage-io-buttons">
         <button className="x-manage-btn x-manage-btn-sm x-manage-btn-primary" onClick={handleSave} disabled={isBusy()}>保存配置</button>
       </div>

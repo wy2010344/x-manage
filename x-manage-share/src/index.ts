@@ -1,6 +1,7 @@
 export * from './utils'
 export * from './styles'
-export { isNotionProxyUrl, createNotionClient, notionErrorMessage, parseNotionPageId, detectRootPageKind, listChildDatabases, ensureNotionDatabase, readLastPushedAt, writeLastPushedAt } from './notion'
+export * from './version'
+export { isNotionProxyUrl, createNotionClient, notionErrorMessage, parseNotionPageId, detectRootPageKind, searchRootPages, listChildDatabases, ensureNotionDatabase, readLastPushedAt, writeLastPushedAt } from './notion'
 export type { ChildDatabase } from './notion'
 export type { HubSection, HubStorage } from './components/ControlCenter'
 export { Fab } from './components/Fab'
