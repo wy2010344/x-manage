@@ -72,6 +72,16 @@ export interface ChildDatabase {
   title: string
 }
 
+/** 从 Notion 响应里提取可读的错误描述，用于诊断（代理模式 data 可能是后端包装的结构） */
+function extractError(data: any, fallback: string): string {
+  const d = data?.error ?? data?.data?.error ?? data
+  if (Array.isArray(d)) return fallback
+  const code = typeof d?.code === 'string' ? d.code : ''
+  const message = typeof d?.message === 'string' ? d.message : ''
+  const detail = code && message ? `${code}: ${message}` : (code || message || '')
+  return detail ? `${fallback}（${detail}）` : fallback
+}
+
 /** 列出根页面下所有直接子数据库（child_database 块），用于自动复用/自动建库 */
 export async function listChildDatabases(opts: {
   tokenOrUrl: string
@@ -91,7 +101,7 @@ export async function listChildDatabases(opts: {
         query,
         notionVersion: opts.notionVersion,
       })
-      if (!r.ok) return { ok: false, error: `读取根页面失败 (${r.status})` }
+      if (!r.ok) return { ok: false, error: extractError(r.data, `读取根页面失败 (${r.status})`) }
       for (const b of r.data.results ?? []) {
         if (b.type === 'child_database' && b.child_database) {
           const titleRaw = b.child_database.title
@@ -134,7 +144,7 @@ export async function ensureNotionDatabase(opts: {
       },
       notionVersion: opts.notionVersion,
     })
-    if (!r.ok) return { ok: false, error: `创建数据库失败 (${r.status})` }
+    if (!r.ok) return { ok: false, error: extractError(r.data, `创建数据库失败 (${r.status})`) }
     return { ok: true, databaseId: r.data.id }
   } catch {
     return { ok: false, error: '创建数据库时网络错误' }
