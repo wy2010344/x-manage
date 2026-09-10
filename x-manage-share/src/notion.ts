@@ -77,6 +77,27 @@ export interface ChildDatabase {
   title: string
 }
 
+/**
+ * 检测根页面对象的类型。Notion 只允许在「普通页面」（page/child_page）下直接创建
+ * 子数据库；若根是 child_database/database 会触发 validation_error
+ * 「Can't create databases parented by a database」。用于保存配置前的友好提示与单测。
+ */
+export async function detectRootPageKind(opts: {
+  tokenOrUrl: string
+  notionVersion: string
+  rootPageId: string
+}): Promise<{ kind: 'page' } | { kind: 'database' } | { error: string }> {
+  try {
+    const client = createNotionClient(opts.tokenOrUrl, opts.notionVersion)
+    const b: any = await client.blocks.retrieve({ block_id: opts.rootPageId })
+    if (b.type === 'page' || b.type === 'child_page') return { kind: 'page' }
+    if (b.type === 'database' || b.type === 'child_database') return { kind: 'database' }
+    return { error: `无法识别的 Notion 对象类型：${b.type}` }
+  } catch (e) {
+    return { error: notionErrorMessage(e, '无法访问根页面') }
+  }
+}
+
 /** 列出根页面下所有直接子数据库（child_database 块），用于自动复用/自动建库 */
 export async function listChildDatabases(opts: {
   tokenOrUrl: string
@@ -119,6 +140,11 @@ export async function ensureNotionDatabase(opts: {
   title: string
   properties: Record<string, unknown>
 }): Promise<{ ok: true; databaseId: string } | { ok: false; error: string }> {
+  const kind = await detectRootPageKind(opts)
+  if (kind.error) return { ok: false, error: kind.error }
+  if (kind.kind === 'database') {
+    return { ok: false, error: '根页面是数据库，Notion 不支持在数据库下自动创建子库；请粘贴一个普通页面的链接（如新建一个空页面）' }
+  }
   const list = await listChildDatabases(opts)
   if (!list.ok) return list
   const found = list.databases.find(d => d.title === opts.title)
