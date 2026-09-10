@@ -1,15 +1,7 @@
+import { notionFetch } from 'x-manage-share'
 import type { FavTweet } from './types'
 
-const API_BASE = 'https://api.notion.com/v1'
 const NOTION_VERSION = '2023-06-01'
-
-function headers(apiKey: string) {
-  return {
-    Authorization: `Bearer ${apiKey}`,
-    'Notion-Version': NOTION_VERSION,
-    'Content-Type': 'application/json',
-  }
-}
 
 function favToPageProperties(f: FavTweet) {
   return {
@@ -40,30 +32,31 @@ function pageToFav(page: any): FavTweet | null {
   } catch { return null }
 }
 
-export async function verifyFavNotionToken(apiKey: string): Promise<{ ok: boolean; error?: string }> {
+/** tokenOrUrl 支持 Notion API Key 或代理 URL（代理转发请求，token 由代理持有） */
+export async function verifyFavNotionToken(tokenOrUrl: string): Promise<{ ok: boolean; error?: string }> {
   try {
-    const res = await fetch(`${API_BASE}/users/me`, { headers: headers(apiKey) })
-    if (res.ok) return { ok: true }
-    if (res.status === 401) return { ok: false, error: 'API Key 无效' }
-    if (res.status === 403) return { ok: false, error: 'API Key 无权限' }
-    return { ok: false, error: `Notion API 错误 (${res.status})` }
+    const r = await notionFetch({ tokenOrUrl, method: 'GET', path: '/v1/users/me', notionVersion: NOTION_VERSION })
+    if (r.ok) return { ok: true }
+    if (r.status === 401) return { ok: false, error: '访问凭证无效' }
+    if (r.status === 403) return { ok: false, error: '访问凭证无权限' }
+    return { ok: false, error: `Notion API 错误 (${r.status})` }
   } catch {
     return { ok: false, error: '无法连接到 Notion API' }
   }
 }
 
-export async function verifyFavNotionDatabase(apiKey: string, databaseId: string): Promise<{ ok: boolean; error?: string }> {
+export async function verifyFavNotionDatabase(tokenOrUrl: string, databaseId: string): Promise<{ ok: boolean; error?: string }> {
   try {
-    const res = await fetch(`${API_BASE}/databases/${databaseId}`, { headers: headers(apiKey) })
-    if (res.ok) return { ok: true }
-    if (res.status === 404) return { ok: false, error: '数据库不存在或未与 Integration 共享' }
-    return { ok: false, error: `数据库验证错误 (${res.status})` }
+    const r = await notionFetch({ tokenOrUrl, method: 'GET', path: `/v1/databases/${databaseId}`, notionVersion: NOTION_VERSION })
+    if (r.ok) return { ok: true }
+    if (r.status === 404) return { ok: false, error: '数据库不存在或未与 Integration 共享' }
+    return { ok: false, error: `数据库验证错误 (${r.status})` }
   } catch {
     return { ok: false, error: '无法连接到 Notion API' }
   }
 }
 
-export async function pullFavsFromNotion(apiKey: string, databaseId: string): Promise<{ ok: true; favs: FavTweet[] } | { ok: false; error: string }> {
+export async function pullFavsFromNotion(tokenOrUrl: string, databaseId: string): Promise<{ ok: true; favs: FavTweet[] } | { ok: false; error: string }> {
   try {
     const favs: FavTweet[] = []
     let cursor: string | undefined
@@ -72,20 +65,15 @@ export async function pullFavsFromNotion(apiKey: string, databaseId: string): Pr
       const body: any = { page_size: 100 }
       if (cursor) body.start_cursor = cursor
 
-      const res = await fetch(`${API_BASE}/databases/${databaseId}/query`, {
-        method: 'POST',
-        headers: headers(apiKey),
-        body: JSON.stringify(body),
-      })
-      if (!res.ok) return { ok: false, error: `拉取失败 (${res.status})` }
+      const r = await notionFetch({ tokenOrUrl, method: 'POST', path: `/v1/databases/${databaseId}/query`, body, notionVersion: NOTION_VERSION })
+      if (!r.ok) return { ok: false, error: `拉取失败 (${r.status})` }
 
-      const data = await res.json()
-      for (const page of data.results) {
+      for (const page of r.data.results) {
         const fav = pageToFav(page)
         if (fav && fav.id) favs.push(fav)
       }
-      if (!data.has_more) break
-      cursor = data.next_cursor
+      if (!r.data.has_more) break
+      cursor = r.data.next_cursor
     }
 
     return { ok: true, favs }
@@ -98,58 +86,37 @@ async function sleep(ms: number) {
   return new Promise(r => setTimeout(r, ms))
 }
 
-export async function pushFavsToNotion(apiKey: string, databaseId: string, favs: FavTweet[]): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function pushFavsToNotion(tokenOrUrl: string, databaseId: string, favs: FavTweet[]): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    const res = await fetch(`${API_BASE}/databases/${databaseId}/query`, {
-      method: 'POST',
-      headers: headers(apiKey),
-      body: JSON.stringify({ page_size: 100 }),
-    })
-    if (!res.ok) return { ok: false, error: `同步前查询失败 (${res.status})` }
+    const r = await notionFetch({ tokenOrUrl, method: 'POST', path: `/v1/databases/${databaseId}/query`, body: { page_size: 100 }, notionVersion: NOTION_VERSION })
+    if (!r.ok) return { ok: false, error: `同步前查询失败 (${r.status})` }
 
-    const data = await res.json()
     const existingMap = new Map<string, string>()
-    for (const page of data.results) {
+    for (const page of r.data.results) {
       const id = page.properties?.ID?.title?.[0]?.text?.content
       if (id) existingMap.set(id, page.id)
     }
 
-    let cursor = data.next_cursor
+    let cursor = r.data.next_cursor
     while (cursor) {
-      const r2 = await fetch(`${API_BASE}/databases/${databaseId}/query`, {
-        method: 'POST',
-        headers: headers(apiKey),
-        body: JSON.stringify({ page_size: 100, start_cursor: cursor }),
-      })
+      const r2 = await notionFetch({ tokenOrUrl, method: 'POST', path: `/v1/databases/${databaseId}/query`, body: { page_size: 100, start_cursor: cursor }, notionVersion: NOTION_VERSION })
       if (!r2.ok) break
-      const d2 = await r2.json()
-      for (const page of d2.results) {
+      for (const page of r2.data.results) {
         const id = page.properties?.ID?.title?.[0]?.text?.content
         if (id) existingMap.set(id, page.id)
       }
-      cursor = d2.has_more ? d2.next_cursor : undefined
+      cursor = r2.data.has_more ? r2.data.next_cursor : undefined
     }
 
     let idx = 0
     for (const fav of favs) {
       const existingPageId = existingMap.get(fav.id)
       if (existingPageId) {
-        const r = await fetch(`${API_BASE}/pages/${existingPageId}`, {
-          method: 'PATCH',
-          headers: headers(apiKey),
-          body: JSON.stringify({ properties: favToPageProperties(fav) }),
-        })
-        if (!r.ok) return { ok: false, error: `更新收藏 ${fav.id} 失败 (${r.status})` }
+        const r3 = await notionFetch({ tokenOrUrl, method: 'PATCH', path: `/v1/pages/${existingPageId}`, body: { properties: favToPageProperties(fav) }, notionVersion: NOTION_VERSION })
+        if (!r3.ok) return { ok: false, error: `更新收藏 ${fav.id} 失败 (${r3.status})` }
       } else {
-        const r = await fetch(`${API_BASE}/pages`, {
-          method: 'POST',
-          headers: headers(apiKey),
-          body: JSON.stringify({
-            parent: { database_id: databaseId },
-            properties: favToPageProperties(fav),
-          }),
-        })
-        if (!r.ok) return { ok: false, error: `创建收藏 ${fav.id} 失败 (${r.status})` }
+        const r3 = await notionFetch({ tokenOrUrl, method: 'POST', path: '/v1/pages', body: { parent: { database_id: databaseId }, properties: favToPageProperties(fav) }, notionVersion: NOTION_VERSION })
+        if (!r3.ok) return { ok: false, error: `创建收藏 ${fav.id} 失败 (${r3.status})` }
       }
       idx++
       if (idx % 3 === 0) await sleep(1100)
