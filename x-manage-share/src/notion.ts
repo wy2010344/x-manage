@@ -150,7 +150,7 @@ function pickAuthorProperty(properties: Record<string, any>): string | null {
 }
 
 /**
- * 在根数据库中定位「作者=author」的记录行（page），不存在则自动创建该行。
+ * 在根数据库中定位「登记账号=author」的记录行（page），不存在则自动创建该行。
  * 数据库模式下每条记录代表一位用户，业务子库将建在返回的记录页之下。
  */
 async function resolveAuthorRow(opts: {
@@ -177,6 +177,32 @@ async function resolveAuthorRow(opts: {
       : { [authorProp]: { rich_text: [{ text: { content: opts.author } }] } }
     const row: any = await client.pages.create({ parent: { database_id: opts.databaseId }, properties: props })
     return { ok: true, rowPageId: row.id }
+  } catch (e) {
+    return { ok: false, error: notionErrorMessage(e, '在根数据库中定位作者失败') }
+  }
+}
+
+/** 与 resolveAuthorRow 相同，但只查询不创建（用于恢复等只读场景） */
+export async function findAuthorRow(opts: {
+  tokenOrUrl: string
+  notionVersion: string
+  databaseId: string
+  author: string
+}): Promise<{ ok: true; rowPageId: string } | { ok: false; notFound: true } | { ok: false; error: string }> {
+  try {
+    const client = createNotionClient(opts.tokenOrUrl, opts.notionVersion)
+    const db: any = await client.databases.retrieve({ database_id: opts.databaseId })
+    const authorProp = pickAuthorProperty(db.properties)
+    if (!authorProp) return { ok: false, error: '根数据库中未找到可用于作者索引的文本列' }
+    const propType = db.properties[authorProp].type
+    const filterName = propType === 'title' ? 'title' : 'rich_text'
+    const q: any = await client.databases.query({
+      database_id: opts.databaseId,
+      filter: { property: authorProp, [filterName]: { equals: opts.author } },
+      page_size: 1,
+    })
+    if (q.results?.length) return { ok: true, rowPageId: q.results[0].id }
+    return { ok: false, notFound: true }
   } catch (e) {
     return { ok: false, error: notionErrorMessage(e, '在根数据库中定位作者失败') }
   }

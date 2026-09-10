@@ -89,7 +89,7 @@ export function NotionHubPanel({ storage, modules, showToast }: Props) {
       </div>
       <div style={{ fontSize: 11, color: '#636e72', marginBottom: 8, lineHeight: 1.5 }}>
         所有模块共享同一份配置。填入代理 URL 与根对象链接后，各模块（标签/收藏…）会自动建库并每 30 分钟增量推送；遇到异常可在下方按模块「从 Notion 恢复」拉取并合并回本地。
-        <br />根对象支持两种：① 普通页面——直接在该页面下按作者建 `标签 (@handle)` / `收藏 (@handle)` 子库；② 数据库——每条记录代表一位用户，业务子库建在对应记录页之下。
+        <br />根对象支持两种：① 普通页面——直接在该页面下建固定 `标签` / `收藏` 子库；② 数据库——每条记录代表一位用户，业务子库（`标签` / `收藏`）建在当前登录账号对应的登记记录页之下。
       </div>
       <input className="x-manage-input" type="text" value={proxyUrl} onChange={e => setProxyUrl(e.target.value)} placeholder="代理 URL，如 https://example.com/api/notion" style={{ marginBottom: 6 }} />
       <input className="x-manage-input" type="text" value={rootPageUrl} onChange={e => setRootPageUrl(e.target.value)} placeholder="根对象：Notion 页面链接、数据库链接或 ID" style={{ marginBottom: 6 }} />
