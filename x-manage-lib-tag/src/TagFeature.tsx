@@ -1,12 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Toast } from 'x-manage-share'
 import { getAllTags, getTagsByAuthor, addTag, updateTag, deleteTag } from './tagStore'
-import type { TweetTag, TagStorage } from './types'
+import type { TweetTag } from './types'
 import { TagPanel } from './TagPanel'
 
-interface Props {
-  storage: TagStorage
-}
+interface Props {}
 
 function AddTagTab({ initial, onTagsChanged, showToast }: {
   initial: { authorHandle: string; authorName: string; tweetId: string; tweetUrl: string }
@@ -95,7 +93,7 @@ function AddTagTab({ initial, onTagsChanged, showToast }: {
   )
 }
 
-export function TagFeature({ storage }: Props) {
+export function TagFeature(_props: Props) {
   const [toast, setToast] = useState<string | null>(null)
   const [dialogData, setDialogData] = useState<{ authorHandle: string; authorName: string; tweetId: string; tweetUrl: string } | null>(null)
   const [activeTab, setActiveTab] = useState<'add' | 'all'>('add')
@@ -118,7 +116,7 @@ export function TagFeature({ storage }: Props) {
 
   useEffect(() => {
     getAllTags().then(setTags).catch(() => {})
-  }, [storage])
+  }, [])
 
   const closeDialog = () => setDialogData(null)
 
