@@ -1,4 +1,4 @@
-import { ensureNotionDatabase, listChildDatabases, notionFetch, readLastPushedAt, writeLastPushedAt } from 'x-manage-share'
+import { createNotionClient, ensureNotionDatabase, listChildDatabases, notionErrorMessage, readLastPushedAt, writeLastPushedAt } from 'x-manage-share'
 import type { FavTweet, FavStorage } from './types'
 import { getAllFavs, importFavs } from './favStore'
 
@@ -52,61 +52,70 @@ function pageToFav(page: any): FavTweet | null {
   } catch { return null }
 }
 
+/** 查询现有页面 id → page_id 映射（ID 是主键，分页完整拉取） */
+async function fetchExistingPageIds(client: any, databaseId: string): Promise<Map<string, string>> {
+  const existing = new Map<string, string>()
+  let cursor: string | undefined
+  while (true) {
+    const r = await client.databases.query({
+      database_id: databaseId,
+      page_size: 100,
+      start_cursor: cursor,
+    })
+    for (const page of r.results ?? []) {
+      const id = page.properties?.ID?.title?.[0]?.text?.content
+      if (id) existing.set(id, page.id)
+    }
+    if (!r.has_more) break
+    cursor = r.next_cursor
+  }
+  return existing
+}
+
 async function pushRowsToDatabase(tokenOrUrl: string, databaseId: string, rows: FavTweet[]): Promise<{ ok: boolean; error?: string }> {
   try {
-    const r = await notionFetch({ tokenOrUrl, method: 'POST', path: `/v1/databases/${databaseId}/query`, body: { page_size: 100 }, notionVersion: NOTION_VERSION })
-    if (!r.ok) return { ok: false, error: `查询现有收藏失败 (${r.status})` }
-
-    const existingMap = new Map<string, string>()
-    for (const page of r.data.results ?? []) {
-      const id = page.properties?.ID?.title?.[0]?.text?.content
-      if (id) existingMap.set(id, page.id)
-    }
-    let cursor = r.data.next_cursor
-    while (cursor) {
-      const r2 = await notionFetch({ tokenOrUrl, method: 'POST', path: `/v1/databases/${databaseId}/query`, body: { page_size: 100, start_cursor: cursor }, notionVersion: NOTION_VERSION })
-      if (!r2.ok) break
-      for (const page of r2.data.results ?? []) {
-        const id = page.properties?.ID?.title?.[0]?.text?.content
-        if (id) existingMap.set(id, page.id)
-      }
-      cursor = r2.data.has_more ? r2.data.next_cursor : undefined
-    }
+    const client = createNotionClient(tokenOrUrl, NOTION_VERSION)
+    const existingMap = await fetchExistingPageIds(client, databaseId)
 
     let idx = 0
     for (const fav of rows) {
       const existingPageId = existingMap.get(fav.id)
       if (existingPageId) {
-        const r3 = await notionFetch({ tokenOrUrl, method: 'PATCH', path: `/v1/pages/${existingPageId}`, body: { properties: favToPageProperties(fav) }, notionVersion: NOTION_VERSION })
-        if (!r3.ok) return { ok: false, error: `更新收藏 ${fav.id} 失败 (${r3.status})` }
+        await client.pages.update({ page_id: existingPageId, properties: favToPageProperties(fav) })
       } else {
-        const r3 = await notionFetch({ tokenOrUrl, method: 'POST', path: '/v1/pages', body: { parent: { database_id: databaseId }, properties: favToPageProperties(fav) }, notionVersion: NOTION_VERSION })
-        if (!r3.ok) return { ok: false, error: `创建收藏 ${fav.id} 失败 (${r3.status})` }
+        await client.pages.create({
+          parent: { database_id: databaseId },
+          properties: favToPageProperties(fav),
+        })
       }
       idx++
       if (idx % 3 === 0) await new Promise(r => setTimeout(r, 1100))
     }
     return { ok: true }
-  } catch {
-    return { ok: false, error: '推送收藏时网络错误' }
+  } catch (e) {
+    return { ok: false, error: notionErrorMessage(e, '推送收藏时请求失败') }
   }
 }
 
 async function pullRowsFromDatabase(tokenOrUrl: string, databaseId: string): Promise<FavTweet[]> {
   const rows: FavTweet[] = []
   let cursor: string | undefined
-  while (true) {
-    const body: any = { page_size: 100 }
-    if (cursor) body.start_cursor = cursor
-    const r = await notionFetch({ tokenOrUrl, method: 'POST', path: `/v1/databases/${databaseId}/query`, body, notionVersion: NOTION_VERSION })
-    if (!r.ok) return rows
-    for (const page of r.data.results ?? []) {
-      const fav = pageToFav(page)
-      if (fav && fav.id) rows.push(fav)
+  try {
+    const client = createNotionClient(tokenOrUrl, NOTION_VERSION)
+    while (true) {
+      const r = await client.databases.query({
+        database_id: databaseId,
+        page_size: 100,
+        start_cursor: cursor,
+      })
+      for (const page of r.results ?? []) {
+        const fav = pageToFav(page)
+        if (fav && fav.id) rows.push(fav)
+      }
+      if (!r.has_more) break
+      cursor = r.next_cursor
     }
-    if (!r.data.has_more) break
-    cursor = r.data.next_cursor
-  }
+  } catch { /* 单个库拉取失败时返回已取到的部分 */ }
   return rows
 }
 
