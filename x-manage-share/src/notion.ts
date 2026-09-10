@@ -78,6 +78,30 @@ export interface ChildDatabase {
 }
 
 /**
+ * 通过代理搜索可作根页面的普通页面（排除数据库/子数据库）。
+ * 用于「不知道填什么」的场景：列出工作区里可供建库的正常页面供用户挑选。
+ */
+export async function searchRootPages(opts: {
+  tokenOrUrl: string
+  notionVersion: string
+}): Promise<{ ok: true; pages: { id: string; title: string }[] } | { ok: false; error: string }> {
+  try {
+    const client = createNotionClient(opts.tokenOrUrl, opts.notionVersion)
+    const r: any = await client.search({ page_size: 100, filter: { value: 'page', property: 'object' } })
+    const pages: { id: string; title: string }[] = []
+    for (const item of r.results ?? []) {
+      if (item.object !== 'page') continue
+      const titleRaw = item.properties?.title?.title
+      const title = Array.isArray(titleRaw) ? titleRaw.map((x: any) => x.plain_text ?? '').join('') : ''
+      pages.push({ id: item.id, title: title || '(无标题页面)' })
+    }
+    return { ok: true, pages }
+  } catch (e) {
+    return { ok: false, error: notionErrorMessage(e, '搜索可用页面失败') }
+  }
+}
+
+/**
  * 检测根页面对象的类型。Notion 只允许在「普通页面」（page/child_page）下直接创建
  * 子数据库；若根是 child_database/database 会触发 validation_error
  * 「Can't create databases parented by a database」。用于保存配置前的友好提示与单测。
