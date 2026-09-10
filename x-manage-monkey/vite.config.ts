@@ -20,6 +20,7 @@ export default defineConfig({
           'GM_getValue',
           'GM_deleteValue',
           'GM_addStyle',
+          'GM_xmlhttpRequest',
         ],
       },
     }),

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   isNotionProxyUrl,
   parseNotionPageId,
@@ -60,6 +60,10 @@ beforeEach(() => {
   ;(Client as any).__handlers?.clear?.()
 })
 
+afterEach(() => {
+  ;(globalThis as any).GM_xmlhttpRequest = undefined
+})
+
 describe('isNotionProxyUrl', () => {
   it('recognizes http(s) proxy urls, rejects keys and blanks', () => {
     expect(isNotionProxyUrl('https://proxy.test/api/notion')).toBe(true)
@@ -93,6 +97,37 @@ describe('createNotionClient', () => {
   })
   it('throws on blank configuration', () => {
     expect(() => createNotionClient('', VER)).toThrow('not configured')
+  })
+  it('uses GM_xmlhttpRequest when present (Tampermonkey path)', async () => {
+    const calls: any[] = []
+    ;(globalThis as any).GM_xmlhttpRequest = (opts: any) => {
+      calls.push(opts)
+      expect(opts.method).toBe('POST')
+      expect(opts.url).toBe(PROXY)
+      expect(opts.headers['Content-Type']).toContain('application/json')
+      expect(JSON.parse(opts.data)).toMatchObject({ method: 'get', path: 'users/me' })
+      opts.onload({ status: 200, responseText: JSON.stringify({ name: 'db-view', type: 'bot' }) })
+    }
+    const client = createNotionClient(PROXY, VER)
+    const out = await (client as any).request({ method: 'get', path: 'users/me', query: {}, body: {} })
+    expect(out.name).toBe('db-view')
+    expect(calls.length).toBe(1)
+  })
+  it('re-throws error bodies delivered inside HTTP 200 via GM path', async () => {
+    ;(globalThis as any).GM_xmlhttpRequest = (opts: any) => {
+      opts.onload({ status: 200, responseText: JSON.stringify({ name: 'APIResponseError', status: 404, code: 'object_not_found', body: '{"object":"error","status":404,"code":"object_not_found","message":"Could not find block"}' }) })
+    }
+    const client = createNotionClient(PROXY, VER)
+    await expect((client as any).request({ method: 'get', path: 'blocks/xxx', query: {}, body: {} }))
+      .rejects.toMatchObject({ code: 'object_not_found', status: 404 })
+  })
+  it('rejects and surfaces network errors from GM onerror', async () => {
+    ;(globalThis as any).GM_xmlhttpRequest = (opts: any) => {
+      opts.onerror({ status: 0, error: 'CSP blocked the request' })
+    }
+    const client = createNotionClient(PROXY, VER)
+    await expect((client as any).request({ method: 'get', path: 'users/me', query: {}, body: {} }))
+      .rejects.toMatchObject({ code: 'network_error' })
   })
 })
 
