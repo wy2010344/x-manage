@@ -42,10 +42,14 @@ export async function notionFetch(opts: NotionFetchOptions): Promise<NotionFetch
   const tokenOrUrl = opts.tokenOrUrl.trim()
   let res: Response
   if (isNotionProxyUrl(tokenOrUrl)) {
+    // 代理端与 chat-note 一致：期望 SDK 规范化格式（小写 method + 不带 /v1/ 前缀的 path），
+    // token/Notion-Version 由代理持有。直接传 /v1/xxx + 大写 method 会拼出无效 URL。
+    const proxyMethod = opts.method.toLowerCase()
+    const proxyPath = opts.path.replace(/^\/v1\//, '')
     res = await fetch(tokenOrUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json; charset=utf-8' },
-      body: JSON.stringify({ method: opts.method, path: opts.path, query: opts.query, body: opts.body }),
+      body: JSON.stringify({ method: proxyMethod, path: proxyPath, query: opts.query, body: opts.body }),
     })
   } else {
     const url = new URL(`${NOTION_API}${opts.path}`)
