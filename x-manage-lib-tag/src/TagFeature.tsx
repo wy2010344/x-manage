@@ -3,7 +3,6 @@ import { Toast } from 'x-manage-share'
 import { getAllTags, getTagsByAuthor, addTag, updateTag, deleteTag } from './tagStore'
 import type { TweetTag, TagStorage } from './types'
 import { TagPanel } from './TagPanel'
-import { NotionPanel } from './NotionPanel'
 
 interface Props {
   storage: TagStorage
@@ -99,10 +98,8 @@ function AddTagTab({ initial, onTagsChanged, showToast }: {
 export function TagFeature({ storage }: Props) {
   const [toast, setToast] = useState<string | null>(null)
   const [dialogData, setDialogData] = useState<{ authorHandle: string; authorName: string; tweetId: string; tweetUrl: string } | null>(null)
-  const [activeTab, setActiveTab] = useState<'add' | 'all' | 'notion'>('add')
+  const [activeTab, setActiveTab] = useState<'add' | 'all'>('add')
   const [tags, setTags] = useState<TweetTag[]>([])
-  const [notionKey, setNotionKey] = useState('')
-  const [notionDbId, setNotionDbId] = useState('')
 
   const showToast = useCallback((msg: string) => {
     setToast(msg)
@@ -121,9 +118,6 @@ export function TagFeature({ storage }: Props) {
 
   useEffect(() => {
     getAllTags().then(setTags).catch(() => {})
-    storage.getNotionConfig?.().then(c => {
-      if (c) { setNotionKey(c.apiKey); setNotionDbId(c.databaseId) }
-    }).catch(() => {})
   }, [storage])
 
   const closeDialog = () => setDialogData(null)
@@ -144,20 +138,14 @@ export function TagFeature({ storage }: Props) {
                   className={`x-manage-btn x-manage-btn-sm ${activeTab === 'all' ? 'x-manage-btn-primary' : 'x-manage-btn-secondary'}`}
                   onClick={() => setActiveTab('all')}
                 >全部标签</button>
-                <button
-                  className={`x-manage-btn x-manage-btn-sm ${activeTab === 'notion' ? 'x-manage-btn-primary' : 'x-manage-btn-secondary'}`}
-                  onClick={() => setActiveTab('notion')}
-                >Notion同步</button>
               </div>
               <button className="x-manage-tag-dialog-close" onClick={closeDialog}>✕</button>
             </div>
             <div className="x-manage-tag-dialog-body">
               {activeTab === 'add' ? (
                 <AddTagTab initial={dialogData} onTagsChanged={() => getAllTags().then(setTags)} showToast={showToast} />
-              ) : activeTab === 'all' ? (
-                <TagPanel tags={tags} setTags={setTags} showToast={showToast} />
               ) : (
-                <NotionPanel tags={tags} setTags={setTags} showToast={showToast} storage={storage} notionKey={notionKey} notionDbId={notionDbId} setNotionKey={setNotionKey} setNotionDbId={setNotionDbId} />
+                <TagPanel tags={tags} setTags={setTags} showToast={showToast} />
               )}
             </div>
           </div>

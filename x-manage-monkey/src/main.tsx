@@ -12,6 +12,7 @@ import {
   updateTweetTags,
   TAG_STYLES,
   getAllTags,
+  pushTagsUnpushed,
 } from 'x-manage-lib-tag'
 import {
   FavSettingsPanel,
@@ -19,6 +20,7 @@ import {
   updateFavButtonStates,
   FAV_STYLES,
   getAllFavs,
+  pushFavsUnpushed,
 } from 'x-manage-lib-fav'
 import * as storage from './storage'
 
@@ -54,6 +56,19 @@ async function processAll() {
   }
 }
 
+// 定期自动推送到 Notion（标签/收藏各自增量，未配置时静默跳过；多标签页以模块内锁防重入）
+const NOTION_PUSH_INTERVAL = 30 * 60 * 1000
+let notionPushing = false
+async function autoPushNotion() {
+  if (notionPushing) return
+  notionPushing = true
+  try {
+    await Promise.allSettled([pushTagsUnpushed(storage), pushFavsUnpushed(storage)])
+  } finally {
+    notionPushing = false
+  }
+}
+
 function init() {
   const container = document.createElement('div')
   container.id = 'x-manage-root'
@@ -83,6 +98,8 @@ function init() {
   }).observe(document.body, { childList: true, subtree: true })
 
   processAll()
+  autoPushNotion()
+  setInterval(autoPushNotion, NOTION_PUSH_INTERVAL)
 }
 
 if (document.readyState === 'loading') {

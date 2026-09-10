@@ -59,7 +59,7 @@ export async function exportBlockWords(): Promise<string> {
 }
 
 const FAB_POS_KEY = 'x_manage_fab_position'
-const NOTION_CONFIG_KEY = 'x_manage_notion_config'
+const NOTION_SETUP_KEY = 'x_manage_notion_setup'
 const XLINK_CONFIG_KEY = 'x_manage_xlink_config'
 
 export async function getFabPosition(): Promise<{ top: number; left: number } | null> {
@@ -71,13 +71,13 @@ export async function setFabPosition(pos: { top: number; left: number }): Promis
   try { GM_setValue(FAB_POS_KEY, JSON.stringify(pos)) } catch (err) { console.error('x-manage setFabPosition error:', err) }
 }
 
-export async function getNotionConfig(): Promise<{ apiKey: string; databaseId: string } | null> {
-  try { return JSON.parse(GM_getValue(NOTION_CONFIG_KEY, 'null')) }
+export async function getNotionSetup(): Promise<{ proxyUrl: string; rootPageId: string } | null> {
+  try { return JSON.parse(GM_getValue(NOTION_SETUP_KEY, 'null')) }
   catch { return null }
 }
 
-export async function setNotionConfig(config: { apiKey: string; databaseId: string }): Promise<void> {
-  try { GM_setValue(NOTION_CONFIG_KEY, JSON.stringify(config)) } catch (err) { console.error('x-manage setNotionConfig error:', err) }
+export async function setNotionSetup(setup: { proxyUrl: string; rootPageId: string }): Promise<void> {
+  try { GM_setValue(NOTION_SETUP_KEY, JSON.stringify(setup)) } catch (err) { console.error('x-manage setNotionSetup error:', err) }
 }
 
 export async function getXLinkConfig(): Promise<{ enabled: boolean; mode: 'iframe' | 'new-window' }> {

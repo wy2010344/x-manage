@@ -18,8 +18,6 @@ export function TagSettingsPanel({ storage }: Props) {
   const [toast, setToast] = useState<string | null>(null)
   const [tab, setTab] = useState<'all' | 'notion'>('all')
   const [tags, setTags] = useState<TweetTag[]>([])
-  const [notionKey, setNotionKey] = useState('')
-  const [notionDbId, setNotionDbId] = useState('')
 
   const showToast = useCallback((msg: string) => {
     setToast(msg)
@@ -28,9 +26,6 @@ export function TagSettingsPanel({ storage }: Props) {
 
   useEffect(() => {
     getAllTags().then(setTags).catch(() => {})
-    storage.getNotionConfig?.().then(c => {
-      if (c) { setNotionKey(c.apiKey); setNotionDbId(c.databaseId) }
-    }).catch(() => {})
   }, [storage])
 
   return (
@@ -43,7 +38,7 @@ export function TagSettingsPanel({ storage }: Props) {
       {tab === 'all' ? (
         <TagPanel tags={tags} setTags={setTags} showToast={showToast} />
       ) : (
-        <NotionPanel tags={tags} setTags={setTags} showToast={showToast} storage={storage} notionKey={notionKey} notionDbId={notionDbId} setNotionKey={setNotionKey} setNotionDbId={setNotionDbId} />
+        <NotionPanel tags={tags} setTags={setTags} showToast={showToast} storage={storage} />
       )}
     </>
   )

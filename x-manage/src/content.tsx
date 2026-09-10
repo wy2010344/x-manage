@@ -1,8 +1,8 @@
 import ReactDOM from 'react-dom/client'
 import { STYLES, ControlCenter, isSelfMutationBatch } from 'x-manage-share'
 import { BlockSettingsPanel, processNewTweets, BLOCK_STYLES } from 'x-manage-lib-block'
-import { TagFeature, TagSettingsPanel, ensureTagButtons, updateTweetTags, TAG_STYLES, getAllTags } from 'x-manage-lib-tag'
-import { FavSettingsPanel, ensureFavButtons, updateFavButtonStates, FAV_STYLES, getAllFavs } from 'x-manage-lib-fav'
+import { TagFeature, TagSettingsPanel, ensureTagButtons, updateTweetTags, TAG_STYLES, getAllTags, pushTagsUnpushed } from 'x-manage-lib-tag'
+import { FavSettingsPanel, ensureFavButtons, updateFavButtonStates, FAV_STYLES, getAllFavs, pushFavsUnpushed } from 'x-manage-lib-fav'
 // import { XLinkFeature, XLINK_STYLES } from 'x-manage-lib-xlink'
 import * as storage from './storage'
 
@@ -40,6 +40,19 @@ async function processAll() {
   }
 }
 
+// 定期自动推送到 Notion（标签/收藏各自增量，未配置时静默跳过；多标签页以模块内锁防重入）
+const NOTION_PUSH_INTERVAL = 30 * 60 * 1000
+let notionPushing = false
+async function autoPushNotion() {
+  if (notionPushing) return
+  notionPushing = true
+  try {
+    await Promise.allSettled([pushTagsUnpushed(storage), pushFavsUnpushed(storage)])
+  } finally {
+    notionPushing = false
+  }
+}
+
 function init() {
   const container = document.createElement('div')
   container.id = 'x-manage-root'
@@ -72,6 +85,8 @@ function init() {
   storage.onWordsChanged(() => { processAll() })
 
   processAll()
+  autoPushNotion()
+  setInterval(autoPushNotion, NOTION_PUSH_INTERVAL)
 }
 
 if (document.readyState === 'loading') {

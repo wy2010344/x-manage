@@ -1,9 +1,8 @@
 import { openDB, type IDBPDatabase } from 'idb'
-import type { FavTweet, FavNotionConfig } from './types'
+import type { FavTweet } from './types'
 
 const DB_NAME = 'x-manage-favs'
 const STORE = 'favs'
-const NOTION_STORE = 'fav-notion-config'
 
 let dbPromise: Promise<IDBPDatabase> | null = null
 
@@ -16,9 +15,6 @@ function getDb() {
       upgrade(db) {
         if (!db.objectStoreNames.contains(STORE)) {
           db.createObjectStore(STORE, { keyPath: 'id' })
-        }
-        if (!db.objectStoreNames.contains(NOTION_STORE)) {
-          db.createObjectStore(NOTION_STORE, { keyPath: 'key' })
         }
       },
     })
@@ -124,16 +120,4 @@ export async function importFavs(favs: FavTweet[]): Promise<number> {
   await tx.done
   invalidate()
   return count
-}
-
-/** Notion 独立配置读写 */
-export async function getFavNotionConfig(): Promise<FavNotionConfig | null> {
-  const db = await getDb()
-  const row = await db.get<{ key: string; value: FavNotionConfig }>(NOTION_STORE, 'notion')
-  return row?.value || null
-}
-
-export async function setFavNotionConfig(config: FavNotionConfig): Promise<void> {
-  const db = await getDb()
-  await db.put(NOTION_STORE, { key: 'notion', value: config })
 }
