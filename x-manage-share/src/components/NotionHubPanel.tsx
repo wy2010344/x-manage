@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { listChildDatabases, detectRootPageKind, searchRootPages, parseNotionPageId, readLastPushedAt } from '../notion'
+import { detectRootPageKind, searchRootPages, parseNotionPageId, readLastPushedAt } from '../notion'
 import { XMANAGE_VERSION } from '../version'
 
 export interface NotionSyncModule {
@@ -68,10 +68,7 @@ export function NotionHubPanel({ storage, modules, showToast }: Props) {
     setBusyAction('save')
     const version = modules[0]?.version || FALLBACK_VERSION
     const kind = await detectRootPageKind({ tokenOrUrl: url, notionVersion: version, rootPageId })
-    if (kind.error) { showToast(`无法访问根页面：${kind.error}`); setBusyAction(null); return }
-    if (kind.kind === 'database') { showToast('根页面是数据库：Notion 不支持在数据库下自动建子库，请改用普通页面的链接'); setBusyAction(null); return }
-    const probe = await listChildDatabases({ tokenOrUrl: url, notionVersion: version, rootPageId })
-    if (!probe.ok) { showToast(`无法访问根页面：${probe.error}`); setBusyAction(null); return }
+    if (kind.error) { showToast(`无法访问根对象：${kind.error}`); setBusyAction(null); return }
     await storage.setNotionSetup({ proxyUrl: url, rootPageId })
     showToast('Notion 配置已保存')
     setBusyAction(null)
@@ -106,8 +103,8 @@ export function NotionHubPanel({ storage, modules, showToast }: Props) {
         <span style={{ fontSize: 11, color: '#a0a0a0' }}>v{XMANAGE_VERSION}</span>
       </div>
       <div style={{ fontSize: 11, color: '#636e72', marginBottom: 8, lineHeight: 1.5 }}>
-        所有模块共享同一份配置。填入代理 URL 与根页面链接后，各模块（标签/收藏…）会自动在根页面下按作者建库并每 30 分钟增量推送；遇到异常可在下方按模块「从 Notion 恢复」拉取并合并回本地。
-        <br />⚠️ 根页面必须是「普通页面」——数据库链接（形如 app.notion.com/p/….?v=…）不可以，Notion 不允许在数据库下建库。可用右上「列出工作区可用页面」直接挑选一个普通页面。
+        所有模块共享同一份配置。填入代理 URL 与根对象链接后，各模块（标签/收藏…）会自动建库并每 30 分钟增量推送；遇到异常可在下方按模块「从 Notion 恢复」拉取并合并回本地。
+        <br />根对象支持两种：① 普通页面——直接在该页面下按作者建 `标签 (@handle)` / `收藏 (@handle)` 子库；② 数据库——每条记录代表一位用户，业务子库建在对应记录页之下。可用右上「列出工作区可用页面」直接挑选。
       </div>
       <input className="x-manage-input" type="text" value={proxyUrl} onChange={e => setProxyUrl(e.target.value)} placeholder="代理 URL，如 https://example.com/api/notion" style={{ marginBottom: 6 }} />
       <input className="x-manage-input" type="text" value={rootPageUrl} onChange={e => setRootPageUrl(e.target.value)} placeholder="根页面：Notion 普通页面链接或页面 ID" style={{ marginBottom: 6 }} />

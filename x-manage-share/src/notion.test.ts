@@ -29,14 +29,30 @@ const { Client } = vi.hoisted(() => {
       },
     }
     databases = {
+      retrieve: vi.fn(async (args: any) => {
+        const h = handlers.get('databases.retrieve')
+        if (!h) throw new Error('databases.retrieve not stubbed')
+        return h(args)
+      }),
       create: vi.fn(async (args: any) => {
         const h = handlers.get('databases.create')
         if (!h) throw new Error('databases.create not stubbed')
         return h(args)
       }),
-      query: vi.fn(),
+      query: vi.fn(async (args: any) => {
+        const h = handlers.get('databases.query')
+        if (!h) throw new Error('databases.query not stubbed')
+        return h(args)
+      }),
     }
-    pages = { create: vi.fn(), update: vi.fn() }
+    pages = {
+      create: vi.fn(async (args: any) => {
+        const h = handlers.get('pages.create')
+        if (!h) throw new Error('pages.create not stubbed')
+        return h(args)
+      }),
+      update: vi.fn(),
+    }
     search = vi.fn(async (args: any) => {
       const h = handlers.get('search')
       if (!h) throw new Error('search not stubbed')
@@ -189,7 +205,7 @@ describe('listChildDatabases', () => {
     })
     const r = await listChildDatabases({ tokenOrUrl: PROXY, notionVersion: VER, rootPageId: 'page1' })
     expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.error).toContain('读取根页面失败')
+    if (!r.ok) expect(r.error).toContain('读取根对象失败')
   })
 })
 
@@ -211,13 +227,44 @@ describe('ensureNotionDatabase', () => {
     const r = await ensureNotionDatabase({ tokenOrUrl: PROXY, notionVersion: VER, rootPageId: 'page1', title: '收藏 (@a)', properties: { ID: { title: {} } } })
     expect(r).toEqual({ ok: true, databaseId: 'dbNew' })
   })
-  it('returns a clear database-root error instead of attempting create', async () => {
+  it('database root without author returns a clear error', async () => {
     ;(Client as any)
       .prototype.set('blocks.retrieve', () => ({ type: 'child_database' }))
-      .set('blocks.children.list', () => ({ has_more: false, results: [] }))
-      .set('databases.create', vi.fn(() => { throw new Error('should not be called') }))
     const r = await ensureNotionDatabase({ tokenOrUrl: PROXY, notionVersion: VER, rootPageId: 'dbRoot', title: '收藏 (@a)', properties: {} })
     expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.error).toContain('根页面是数据库')
+    if (!r.ok) expect(r.error).toContain('提供作者')
+  })
+  it('database root: reuses the author row and finds the module db under it', async () => {
+    ;(Client as any)
+      .prototype.set('blocks.retrieve', () => ({ type: 'child_database' }))
+      .set('databases.retrieve', () => ({ properties: { author: { type: 'rich_text' } } }))
+      .set('databases.query', () => ({ has_more: false, results: [{ id: 'rowA' }] }))
+      .set('blocks.children.list', () => ({ has_more: false, results: [
+        { type: 'child_database', id: 'dbUnderRow', child_database: { title: [{ type: 'text', plain_text: '收藏 (@a)' }] } },
+      ] }))
+    const r = await ensureNotionDatabase({ tokenOrUrl: PROXY, notionVersion: VER, rootPageId: 'dbRoot', title: '收藏 (@a)', author: 'a', properties: {} })
+    expect(r).toEqual({ ok: true, databaseId: 'dbUnderRow' })
+  })
+  it('database root: creates a missing author row then creates the module db under it', async () => {
+    const createdRow = { id: 'rowNew' }
+    let createdChild: any = null
+    ;(Client as any)
+      .prototype.set('blocks.retrieve', () => ({ type: 'child_database' }))
+      .set('databases.retrieve', () => ({ properties: { author: { type: 'rich_text' } } }))
+      .set('databases.query', () => ({ has_more: false, results: [] }))
+      .set('pages.create', (args: any) => {
+        expect(args.parent).toEqual({ database_id: 'dbRoot' })
+        expect(args.properties.author.rich_text[0].text.content).toBe('a')
+        return createdRow
+      })
+      .set('blocks.children.list', () => ({ has_more: false, results: [] }))
+      .set('databases.create', (args: any) => {
+        expect(args.parent).toEqual({ type: 'page_id', page_id: 'rowNew' })
+        createdChild = args
+        return { id: 'dbNewUnderRow' }
+      })
+    const r = await ensureNotionDatabase({ tokenOrUrl: PROXY, notionVersion: VER, rootPageId: 'dbRoot', title: '收藏 (@a)', author: 'a', properties: { ID: { title: {} } } })
+    expect(r).toEqual({ ok: true, databaseId: 'dbNewUnderRow' })
+    expect(createdChild).toBeTruthy()
   })
 })

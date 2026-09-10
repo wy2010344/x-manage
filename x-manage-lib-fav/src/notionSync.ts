@@ -1,4 +1,4 @@
-import { createNotionClient, ensureNotionDatabase, listChildDatabases, notionErrorMessage, readLastPushedAt, writeLastPushedAt } from 'x-manage-share'
+import { createNotionClient, ensureNotionDatabase, listAllChildDatabases, notionErrorMessage, readLastPushedAt, writeLastPushedAt } from 'x-manage-share'
 import type { FavTweet, FavStorage } from './types'
 import { getAllFavs, importFavs } from './favStore'
 
@@ -152,6 +152,7 @@ export async function pushFavsUnpushed(storage: FavStorage): Promise<{ ok: boole
       rootPageId: setup.rootPageId,
       title: dbTitle(handle),
       properties: DB_SCHEMA,
+      author: handle,
     })
     if (!ens.ok) return { ok: false, error: `${handle}: ${ens.error}` }
     const r = await pushRowsToDatabase(setup.proxyUrl, ens.databaseId, rows)
@@ -162,12 +163,12 @@ export async function pushFavsUnpushed(storage: FavStorage): Promise<{ ok: boole
   return { ok: true, pushed: pending.length }
 }
 
-/** 从 Notion 全量拉取所有 `收藏 (@` 作者库并合并到本地（手动恢复用） */
+/** 从 Notion 全量拉取所有 `收藏 (@` 作者库并合并到本地（手动恢复用；根为数据库时遍历所有记录行） */
 export async function restoreFavs(storage: FavStorage): Promise<{ ok: boolean; count?: number; error?: string }> {
   const setup = await getSetup(storage)
   if (!setup) return { ok: false, error: '未配置 Notion 同步' }
 
-  const list = await listChildDatabases({ tokenOrUrl: setup.proxyUrl, notionVersion: NOTION_VERSION, rootPageId: setup.rootPageId })
+  const list = await listAllChildDatabases({ tokenOrUrl: setup.proxyUrl, notionVersion: NOTION_VERSION, rootId: setup.rootPageId })
   if (!list.ok) return { ok: false, error: list.error }
 
   const dbs = list.databases.filter(d => d.title.startsWith(DB_PREFIX))
