@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
+import browser from 'webextension-polyfill';
 import './Popup.css';
 import type { BlockWord } from 'x-manage-lib-block';
+import type { FavTweet } from 'x-manage-lib-fav';
 import {
   getBlockWords,
   addBlockWord,
@@ -10,18 +12,53 @@ import {
   importBlockWords,
 } from '../storage';
 
+/** 向当前活动 tab 的 content script 发消息（收藏数据存在页面 origin 的 IndexedDB，popup 无法直连） */
+async function askFavs(msg: { type: 'get-favs' } | { type: 'remove-fav'; id: string }): Promise<FavTweet[]> {
+  const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+  const tab = tabs[0];
+  if (!tab?.id) throw new Error('no active tab');
+  const res: unknown = await browser.tabs.sendMessage(tab.id, { source: 'x-manage-popup', ...msg });
+  if (!Array.isArray(res)) throw new Error('content script not reachable');
+  return res as FavTweet[];
+}
+
 export default function () {
   const [words, setWords] = useState<BlockWord[]>([]);
   const [inputValue, setInputValue] = useState('');
-  const [activeTab, setActiveTab] = useState<'words' | 'io'>('words');
+  const [activeTab, setActiveTab] = useState<'words' | 'io' | 'fav'>('words');
   const [exportText, setExportText] = useState('');
   const [importText, setImportText] = useState('');
+  const [favs, setFavs] = useState<FavTweet[]>([]);
+  const [favError, setFavError] = useState('');
+  const [favLoading, setFavLoading] = useState(false);
 
   const loadData = useCallback(async () => {
     setWords(await getBlockWords());
   }, []);
 
+  const loadFavs = useCallback(async () => {
+    setFavLoading(true); setFavError('');
+    try {
+      setFavs(await askFavs({ type: 'get-favs' }));
+    } catch {
+      setFavError('无法读取收藏：请在 x.com 页面打开本弹窗，或刷新 X 页面后重试');
+    } finally {
+      setFavLoading(false);
+    }
+  }, []);
+
+  const handleFavDelete = useCallback(async (id: string) => {
+    try {
+      setFavs(await askFavs({ type: 'remove-fav', id }));
+    } catch {
+      loadFavs();
+    }
+  }, [loadFavs]);
+
   useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    if (activeTab === 'fav') loadFavs();
+  }, [activeTab, loadFavs]);
 
   const handleAdd = useCallback(async () => {
     const word = inputValue.trim();
@@ -73,13 +110,13 @@ export default function () {
       </header>
 
       <div className="popup-tabs">
-        {(['words', 'io'] as const).map(tab => (
+        {(['words', 'io', 'fav'] as const).map(tab => (
           <button
             key={tab}
             className={`popup-tab${activeTab === tab ? ' active' : ''}`}
             onClick={() => setActiveTab(tab)}
           >
-            {{ words: '屏蔽词', io: '导入/导出' }[tab]}
+            {{ words: '屏蔽词', io: '导入/导出', fav: '收藏' }[tab]}
           </button>
         ))}
       </div>
@@ -137,6 +174,37 @@ export default function () {
           <button className="popup-btn popup-btn-primary" style={{ width: '100%', marginTop: 8 }} onClick={handleImport} disabled={!importText.trim()}>
             导入
           </button>
+        </div>
+      )}
+
+      {activeTab === 'fav' && (
+        <div className="popup-section">
+          {favLoading ? (
+            <div className="popup-empty">加载中…</div>
+          ) : favError ? (
+            <div className="popup-empty" style={{ color: '#c0392b' }}>{favError}</div>
+          ) : favs.length === 0 ? (
+            <div className="popup-empty">暂无收藏</div>
+          ) : (
+            <div className="popup-list">
+              {favs.map(f => (
+                <div key={f.id} className="popup-item" style={{ height: 'auto', padding: '8px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 0 }}>
+                    <span style={{ fontWeight: 600, color: '#f6b93b' }}>★ {f.authorName || f.authorHandle}</span>
+                    <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', wordBreak: 'break-word' }}>
+                      {f.tweetText.length > 100 ? `${f.tweetText.slice(0, 100)}…` : f.tweetText}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
+                    {f.tweetUrl && (
+                      <a href={f.tweetUrl} target="_blank" rel="noopener noreferrer" className="popup-btn popup-btn-sm">跳转</a>
+                    )}
+                    <button className="popup-btn popup-btn-danger popup-btn-sm" onClick={() => handleFavDelete(f.id)}>删除</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
