@@ -1,4 +1,4 @@
-import { ensureNotionDatabase, listChildDatabases, notionFetch, readLastPushedAt, writeLastPushedAt } from 'x-manage-share'
+import { createNotionClient, ensureNotionDatabase, listChildDatabases, notionErrorMessage, readLastPushedAt, writeLastPushedAt } from 'x-manage-share'
 import type { TweetTag, TagStorage } from './types'
 import { getAllTags, importTags } from './tagStore'
 
@@ -52,61 +52,70 @@ function pageToTag(page: any): TweetTag | null {
   } catch { return null }
 }
 
+/** 查询现有页面 id → page_id 映射（ID 是主键，分页完整拉取） */
+async function fetchExistingPageIds(client: any, databaseId: string): Promise<Map<string, string>> {
+  const existing = new Map<string, string>()
+  let cursor: string | undefined
+  while (true) {
+    const r = await client.databases.query({
+      database_id: databaseId,
+      page_size: 100,
+      start_cursor: cursor,
+    })
+    for (const page of r.results ?? []) {
+      const id = page.properties?.ID?.title?.[0]?.text?.content
+      if (id) existing.set(id, page.id)
+    }
+    if (!r.has_more) break
+    cursor = r.next_cursor
+  }
+  return existing
+}
+
 async function pushRowsToDatabase(tokenOrUrl: string, databaseId: string, rows: TweetTag[]): Promise<{ ok: boolean; error?: string }> {
   try {
-    const r = await notionFetch({ tokenOrUrl, method: 'POST', path: `/v1/databases/${databaseId}/query`, body: { page_size: 100 }, notionVersion: NOTION_VERSION })
-    if (!r.ok) return { ok: false, error: `查询现有标签失败 (${r.status})` }
-
-    const existingMap = new Map<string, string>()
-    for (const page of r.data.results ?? []) {
-      const id = page.properties?.ID?.title?.[0]?.text?.content
-      if (id) existingMap.set(id, page.id)
-    }
-    let cursor = r.data.next_cursor
-    while (cursor) {
-      const r2 = await notionFetch({ tokenOrUrl, method: 'POST', path: `/v1/databases/${databaseId}/query`, body: { page_size: 100, start_cursor: cursor }, notionVersion: NOTION_VERSION })
-      if (!r2.ok) break
-      for (const page of r2.data.results ?? []) {
-        const id = page.properties?.ID?.title?.[0]?.text?.content
-        if (id) existingMap.set(id, page.id)
-      }
-      cursor = r2.data.has_more ? r2.data.next_cursor : undefined
-    }
+    const client = createNotionClient(tokenOrUrl, NOTION_VERSION)
+    const existingMap = await fetchExistingPageIds(client, databaseId)
 
     let idx = 0
     for (const tag of rows) {
       const existingPageId = existingMap.get(tag.id)
       if (existingPageId) {
-        const r3 = await notionFetch({ tokenOrUrl, method: 'PATCH', path: `/v1/pages/${existingPageId}`, body: { properties: tagToPageProperties(tag) }, notionVersion: NOTION_VERSION })
-        if (!r3.ok) return { ok: false, error: `更新标签 ${tag.id} 失败 (${r3.status})` }
+        await client.pages.update({ page_id: existingPageId, properties: tagToPageProperties(tag) })
       } else {
-        const r3 = await notionFetch({ tokenOrUrl, method: 'POST', path: '/v1/pages', body: { parent: { database_id: databaseId }, properties: tagToPageProperties(tag) }, notionVersion: NOTION_VERSION })
-        if (!r3.ok) return { ok: false, error: `创建标签 ${tag.id} 失败 (${r3.status})` }
+        await client.pages.create({
+          parent: { database_id: databaseId },
+          properties: tagToPageProperties(tag),
+        })
       }
       idx++
       if (idx % 3 === 0) await new Promise(r => setTimeout(r, 1100))
     }
     return { ok: true }
-  } catch {
-    return { ok: false, error: '推送标签时网络错误' }
+  } catch (e) {
+    return { ok: false, error: notionErrorMessage(e, '推送标签时请求失败') }
   }
 }
 
 async function pullRowsFromDatabase(tokenOrUrl: string, databaseId: string): Promise<TweetTag[]> {
   const rows: TweetTag[] = []
   let cursor: string | undefined
-  while (true) {
-    const body: any = { page_size: 100 }
-    if (cursor) body.start_cursor = cursor
-    const r = await notionFetch({ tokenOrUrl, method: 'POST', path: `/v1/databases/${databaseId}/query`, body, notionVersion: NOTION_VERSION })
-    if (!r.ok) return rows
-    for (const page of r.data.results ?? []) {
-      const tag = pageToTag(page)
-      if (tag && tag.id) rows.push(tag)
+  try {
+    const client = createNotionClient(tokenOrUrl, NOTION_VERSION)
+    while (true) {
+      const r = await client.databases.query({
+        database_id: databaseId,
+        page_size: 100,
+        start_cursor: cursor,
+      })
+      for (const page of r.results ?? []) {
+        const tag = pageToTag(page)
+        if (tag && tag.id) rows.push(tag)
+      }
+      if (!r.has_more) break
+      cursor = r.next_cursor
     }
-    if (!r.data.has_more) break
-    cursor = r.data.next_cursor
-  }
+  } catch { /* 单个库拉取失败时返回已取到的部分 */ }
   return rows
 }
 
