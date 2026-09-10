@@ -125,7 +125,7 @@ export async function importBlockWords(jsonStr: string): Promise<{ success: bool
 const FAB_POS_KEY = 'x_manage_fab_position'
 const XLINK_CONFIG_KEY = 'x_manage_xlink_config'
 
-const NOTION_CONFIG_KEY = 'x_manage_notion_config'
+const NOTION_CONFIG_KEY = 'x_manage_notion_setup'
 
 export async function getFabPosition(): Promise<{ top: number; left: number } | null> {
   try {
@@ -149,15 +149,15 @@ export async function setXLinkConfig(config: { enabled: boolean; mode: 'iframe' 
   try { await browser.storage.local.set({ [XLINK_CONFIG_KEY]: config }) } catch (err) { console.error('x-manage setXLinkConfig error:', err) }
 }
 
-export async function getNotionConfig(): Promise<{ apiKey: string; databaseId: string } | null> {
+export async function getNotionSetup(): Promise<{ proxyUrl: string; rootPageId: string } | null> {
   try {
     const result = await browser.storage.local.get(NOTION_CONFIG_KEY);
     return result[NOTION_CONFIG_KEY] || null;
   } catch { return null }
 }
 
-export async function setNotionConfig(config: { apiKey: string; databaseId: string }): Promise<void> {
-  try { await browser.storage.local.set({ [NOTION_CONFIG_KEY]: config }) } catch (err) { console.error('x-manage setNotionConfig error:', err) }
+export async function setNotionSetup(setup: { proxyUrl: string; rootPageId: string }): Promise<void> {
+  try { await browser.storage.local.set({ [NOTION_CONFIG_KEY]: setup }) } catch (err) { console.error('x-manage setNotionSetup error:', err) }
 }
 
 export function onWordsChanged(callback: () => void): () => void {

@@ -72,7 +72,7 @@ export function FavSettingsPanel({ storage }: Props) {
       {tab === 'favs' ? (
         <FavListPanel favs={favs} setFavs={setFavsSync} showToast={showToast} />
       ) : (
-        <FavNotionPanel favs={favs} setFavs={setFavsSync} showToast={showToast} />
+        <FavNotionPanel favs={favs} setFavs={setFavsSync} showToast={showToast} storage={storage} />
       )}
     </>
   )

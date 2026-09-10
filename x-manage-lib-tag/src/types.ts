@@ -9,14 +9,16 @@ export interface TweetTag {
   updatedAt: number
 }
 
-export interface NotionConfig {
-  apiKey: string
-  databaseId: string
+export interface NotionSetup {
+  /** 代理 URL：notionFetch 转发路径；未填 API Key（token 由代理持有） */
+  proxyUrl: string
+  /** 根页面 UUID（解析自用户填写的 Notion 页面链接） */
+  rootPageId: string
 }
 
 export interface TagStorage {
-  getNotionConfig: () => Promise<NotionConfig | null>
-  setNotionConfig: (config: NotionConfig) => Promise<void>
+  getNotionSetup: () => Promise<NotionSetup | null>
+  setNotionSetup: (setup: NotionSetup) => Promise<void>
   getFabPosition: () => Promise<{ top: number; left: number } | null>
   setFabPosition: (pos: { top: number; left: number }) => Promise<void>
 }

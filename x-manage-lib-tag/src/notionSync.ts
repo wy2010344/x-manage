@@ -1,7 +1,27 @@
-import { notionFetch } from 'x-manage-share'
-import type { TweetTag } from './types'
+import { ensureNotionDatabase, listChildDatabases, notionFetch, readLastPushedAt, writeLastPushedAt } from 'x-manage-share'
+import type { TweetTag, TagStorage } from './types'
+import { getAllTags, importTags } from './tagStore'
 
 const NOTION_VERSION = '2025-09-03'
+export { NOTION_VERSION as NOTION_TAG_VERSION }
+/** 根页面下按作者自动建的子数据库命名：`标签 (@@handle)` */
+const DB_PREFIX = '标签 (@'
+const LAST_PUSHED_KEY = 'x-manage-tags-lastPushedAt'
+
+function dbTitle(handle: string): string {
+  return `${DB_PREFIX}${handle})`
+}
+
+const DB_SCHEMA = {
+  ID: { title: {} },
+  authorHandle: { rich_text: {} },
+  authorName: { rich_text: {} },
+  tweetId: { rich_text: {} },
+  tweetUrl: { url: {} },
+  tag: { rich_text: {} },
+  createdAt: { number: {} },
+  updatedAt: { number: {} },
+}
 
 function tagToPageProperties(t: TweetTag) {
   return {
@@ -32,76 +52,21 @@ function pageToTag(page: any): TweetTag | null {
   } catch { return null }
 }
 
-/** tokenOrUrl 支持 Notion API Key 或代理 URL（代理转发请求，token 由代理持有） */
-export async function verifyNotionToken(tokenOrUrl: string): Promise<{ ok: boolean; error?: string }> {
-  try {
-    const r = await notionFetch({ tokenOrUrl, method: 'GET', path: '/v1/users/me', notionVersion: NOTION_VERSION })
-    if (r.ok) return { ok: true }
-    if (r.status === 401) return { ok: false, error: '访问凭证无效' }
-    if (r.status === 403) return { ok: false, error: '访问凭证无权限' }
-    return { ok: false, error: `Notion API 错误 (${r.status})` }
-  } catch {
-    return { ok: false, error: '无法连接到 Notion API' }
-  }
-}
-
-export async function verifyNotionDatabase(tokenOrUrl: string, databaseId: string): Promise<{ ok: boolean; error?: string }> {
-  try {
-    const r = await notionFetch({ tokenOrUrl, method: 'GET', path: `/v1/databases/${databaseId}`, notionVersion: NOTION_VERSION })
-    if (r.ok) return { ok: true }
-    if (r.status === 404) return { ok: false, error: '数据库不存在或未与 Integration 共享' }
-    return { ok: false, error: `数据库验证错误 (${r.status})` }
-  } catch {
-    return { ok: false, error: '无法连接到 Notion API' }
-  }
-}
-
-export async function pullTagsFromNotion(tokenOrUrl: string, databaseId: string): Promise<{ ok: true; tags: TweetTag[] } | { ok: false; error: string }> {
-  try {
-    const tags: TweetTag[] = []
-    let cursor: string | undefined
-
-    while (true) {
-      const body: any = { page_size: 100 }
-      if (cursor) body.start_cursor = cursor
-
-      const r = await notionFetch({ tokenOrUrl, method: 'POST', path: `/v1/databases/${databaseId}/query`, body, notionVersion: NOTION_VERSION })
-      if (!r.ok) return { ok: false, error: `拉取失败 (${r.status})` }
-
-      for (const page of r.data.results) {
-        const tag = pageToTag(page)
-        if (tag && tag.id) tags.push(tag)
-      }
-      if (!r.data.has_more) break
-      cursor = r.data.next_cursor
-    }
-
-    return { ok: true, tags }
-  } catch {
-    return { ok: false, error: '拉取数据时网络错误' }
-  }
-}
-
-async function sleep(ms: number) {
-  return new Promise(r => setTimeout(r, ms))
-}
-
-export async function pushTagsToNotion(tokenOrUrl: string, databaseId: string, tags: TweetTag[]): Promise<{ ok: true } | { ok: false; error: string }> {
+async function pushRowsToDatabase(tokenOrUrl: string, databaseId: string, rows: TweetTag[]): Promise<{ ok: boolean; error?: string }> {
   try {
     const r = await notionFetch({ tokenOrUrl, method: 'POST', path: `/v1/databases/${databaseId}/query`, body: { page_size: 100 }, notionVersion: NOTION_VERSION })
-    if (!r.ok) return { ok: false, error: `同步前查询失败 (${r.status})` }
+    if (!r.ok) return { ok: false, error: `查询现有标签失败 (${r.status})` }
 
     const existingMap = new Map<string, string>()
-    for (const page of r.data.results) {
+    for (const page of r.data.results ?? []) {
       const id = page.properties?.ID?.title?.[0]?.text?.content
       if (id) existingMap.set(id, page.id)
     }
-
     let cursor = r.data.next_cursor
     while (cursor) {
       const r2 = await notionFetch({ tokenOrUrl, method: 'POST', path: `/v1/databases/${databaseId}/query`, body: { page_size: 100, start_cursor: cursor }, notionVersion: NOTION_VERSION })
       if (!r2.ok) break
-      for (const page of r2.data.results) {
+      for (const page of r2.data.results ?? []) {
         const id = page.properties?.ID?.title?.[0]?.text?.content
         if (id) existingMap.set(id, page.id)
       }
@@ -109,7 +74,7 @@ export async function pushTagsToNotion(tokenOrUrl: string, databaseId: string, t
     }
 
     let idx = 0
-    for (const tag of tags) {
+    for (const tag of rows) {
       const existingPageId = existingMap.get(tag.id)
       if (existingPageId) {
         const r3 = await notionFetch({ tokenOrUrl, method: 'PATCH', path: `/v1/pages/${existingPageId}`, body: { properties: tagToPageProperties(tag) }, notionVersion: NOTION_VERSION })
@@ -119,11 +84,89 @@ export async function pushTagsToNotion(tokenOrUrl: string, databaseId: string, t
         if (!r3.ok) return { ok: false, error: `创建标签 ${tag.id} 失败 (${r3.status})` }
       }
       idx++
-      if (idx % 3 === 0) await sleep(1100)
+      if (idx % 3 === 0) await new Promise(r => setTimeout(r, 1100))
     }
-
     return { ok: true }
   } catch {
-    return { ok: false, error: '同步到 Notion 时网络错误' }
+    return { ok: false, error: '推送标签时网络错误' }
   }
+}
+
+async function pullRowsFromDatabase(tokenOrUrl: string, databaseId: string): Promise<TweetTag[]> {
+  const rows: TweetTag[] = []
+  let cursor: string | undefined
+  while (true) {
+    const body: any = { page_size: 100 }
+    if (cursor) body.start_cursor = cursor
+    const r = await notionFetch({ tokenOrUrl, method: 'POST', path: `/v1/databases/${databaseId}/query`, body, notionVersion: NOTION_VERSION })
+    if (!r.ok) return rows
+    for (const page of r.data.results ?? []) {
+      const tag = pageToTag(page)
+      if (tag && tag.id) rows.push(tag)
+    }
+    if (!r.data.has_more) break
+    cursor = r.data.next_cursor
+  }
+  return rows
+}
+
+async function getSetup(storage: TagStorage) {
+  const setup = await storage.getNotionSetup?.().catch(() => null)
+  return setup && setup.proxyUrl.trim() && setup.rootPageId.trim() ? setup : null
+}
+
+/**
+ * 增量推送到 Notion：在根页面下按作者自动建/复用 `标签 (@handle)` 子数据库。
+ * 只推送 updatedAt > 上次推送时间的行；成功后更新游标。
+ */
+export async function pushTagsUnpushed(storage: TagStorage): Promise<{ ok: boolean; pushed?: number; message?: string; error?: string }> {
+  const setup = await getSetup(storage)
+  if (!setup) return { ok: false, error: '未配置 Notion 同步' }
+
+  const last = readLastPushedAt(LAST_PUSHED_KEY)
+  const all = await getAllTags().catch(() => [])
+  const pending = all.filter(t => t.updatedAt > last)
+  if (!pending.length) return { ok: true, message: '无需推送' }
+
+  const groups = new Map<string, TweetTag[]>()
+  for (const t of pending) {
+    const arr = groups.get(t.authorHandle) ?? []
+    arr.push(t)
+    groups.set(t.authorHandle, arr)
+  }
+  const maxUpdated = pending.reduce((m, t) => Math.max(m, t.updatedAt), 0)
+
+  for (const [handle, rows] of groups) {
+    const ens = await ensureNotionDatabase({
+      tokenOrUrl: setup.proxyUrl,
+      notionVersion: NOTION_VERSION,
+      rootPageId: setup.rootPageId,
+      title: dbTitle(handle),
+      properties: DB_SCHEMA,
+    })
+    if (!ens.ok) return { ok: false, error: `${handle}: ${ens.error}` }
+    const r = await pushRowsToDatabase(setup.proxyUrl, ens.databaseId, rows)
+    if (!r.ok) return { ok: false, error: `${handle}: ${r.error}` }
+  }
+
+  writeLastPushedAt(LAST_PUSHED_KEY, maxUpdated)
+  return { ok: true, pushed: pending.length }
+}
+
+/** 从 Notion 全量拉取所有 `标签 (@` 作者库并合并到本地（手动恢复用） */
+export async function restoreTags(storage: TagStorage): Promise<{ ok: boolean; count?: number; error?: string }> {
+  const setup = await getSetup(storage)
+  if (!setup) return { ok: false, error: '未配置 Notion 同步' }
+
+  const list = await listChildDatabases({ tokenOrUrl: setup.proxyUrl, notionVersion: NOTION_VERSION, rootPageId: setup.rootPageId })
+  if (!list.ok) return { ok: false, error: list.error }
+
+  const dbs = list.databases.filter(d => d.title.startsWith(DB_PREFIX))
+  const merged: TweetTag[] = []
+  for (const db of dbs) {
+    const rows = await pullRowsFromDatabase(setup.proxyUrl, db.id)
+    merged.push(...rows)
+  }
+  const count = await importTags(merged)
+  return { ok: true, count }
 }
