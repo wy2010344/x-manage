@@ -15,6 +15,9 @@ export default defineConfig({
           'https://twitter.com/*',
           'https://mobile.twitter.com/*',
         ],
+        connect: [
+          'vercel.wangyang2010344.space',
+        ],
         grant: [
           'GM_setValue',
           'GM_getValue',
