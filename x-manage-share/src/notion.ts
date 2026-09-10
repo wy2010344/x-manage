@@ -141,9 +141,9 @@ export async function searchRootPages(opts: {
 }
 
 /**
- * 检测根页面对象的类型。Notion 只允许在「普通页面」（page/child_page）下直接创建
- * 子数据库；若根是 child_database/database 会触发 validation_error
- * 「Can't create databases parented by a database」。用于保存配置前的友好提示与单测。
+ * 检测根对象类型。Notion 支持两种「根」：
+ * - 普通页面（page/child_page）：业务子库直接建在该页面下
+ * - 数据库（database/child_database）：业务子库建在「每位用户一行」的记录页下
  */
 export async function detectRootPageKind(opts: {
   tokenOrUrl: string
@@ -157,11 +157,56 @@ export async function detectRootPageKind(opts: {
     if (b.type === 'database' || b.type === 'child_database') return { kind: 'database' }
     return { error: `无法识别的 Notion 对象类型：${b.type}` }
   } catch (e) {
-    return { error: notionErrorMessage(e, '无法访问根页面') }
+    return { error: notionErrorMessage(e, '无法访问根对象') }
   }
 }
 
-/** 列出根页面下所有直接子数据库（child_database 块），用于自动复用/自动建库 */
+/** 从数据库 properties 中选一个适合存作者/用户名的列：优先即用列，否则回退到首个 title 列 */
+function pickAuthorProperty(properties: Record<string, any>): string | null {
+  const preferred = ['author', 'handle', 'user', '用户', '作者', '用户名', 'handle_']
+  const entries = Object.entries(properties ?? {})
+  for (const key of preferred) {
+    const found = entries.find(([name, prop]) => name.toLowerCase() === key.toLowerCase() && (prop.type === 'title' || prop.type === 'rich_text'))
+    if (found) return found[0]
+  }
+  const titleProp = entries.find(([, prop]) => prop.type === 'title')
+  return titleProp ? titleProp[0] : null
+}
+
+/**
+ * 在根数据库中定位「作者=author」的记录行（page），不存在则自动创建该行。
+ * 数据库模式下每条记录代表一位用户，业务子库将建在返回的记录页之下。
+ */
+async function resolveAuthorRow(opts: {
+  tokenOrUrl: string
+  notionVersion: string
+  databaseId: string
+  author: string
+}): Promise<{ ok: true; rowPageId: string } | { ok: false; error: string }> {
+  try {
+    const client = createNotionClient(opts.tokenOrUrl, opts.notionVersion)
+    const db: any = await client.databases.retrieve({ database_id: opts.databaseId })
+    const authorProp = pickAuthorProperty(db.properties)
+    if (!authorProp) return { ok: false, error: '根数据库中未找到可用于作者索引的文本列' }
+    const propType = db.properties[authorProp].type
+    const filterName = propType === 'title' ? 'title' : 'rich_text'
+    const q: any = await client.databases.query({
+      database_id: opts.databaseId,
+      filter: { property: authorProp, [filterName]: { equals: opts.author } },
+      page_size: 1,
+    })
+    if (q.results?.length) return { ok: true, rowPageId: q.results[0].id }
+    const props: any = propType === 'title'
+      ? { [authorProp]: { title: [{ text: { content: opts.author } }] } }
+      : { [authorProp]: { rich_text: [{ text: { content: opts.author } }] } }
+    const row: any = await client.pages.create({ parent: { database_id: opts.databaseId }, properties: props })
+    return { ok: true, rowPageId: row.id }
+  } catch (e) {
+    return { ok: false, error: notionErrorMessage(e, '在根数据库中定位作者失败') }
+  }
+}
+
+/** 列出根对象下所有直接子数据库（child_database 块），用于自动复用/自动建库 */
 export async function listChildDatabases(opts: {
   tokenOrUrl: string
   notionVersion: string
@@ -191,31 +236,74 @@ export async function listChildDatabases(opts: {
     }
     return { ok: true, databases }
   } catch (e) {
-    return { ok: false, error: notionErrorMessage(e, '读取根页面失败') }
+    return { ok: false, error: notionErrorMessage(e, '读取根对象失败') }
   }
 }
 
-/** 在根页面下查找标题匹配的子数据库；不存在则自动创建，返回其 database_id */
+/**
+ * 列出根下全部业务子库：
+ * - 根是普通页面：该页面下的子库
+ * - 根是数据库：先遍历所有记录行（每行=一位用户），收集每行下的子库
+ */
+export async function listAllChildDatabases(opts: {
+  tokenOrUrl: string
+  notionVersion: string
+  rootId: string
+}): Promise<{ ok: true; databases: ChildDatabase[] } | { ok: false; error: string }> {
+  const kind = await detectRootPageKind({ tokenOrUrl: opts.tokenOrUrl, notionVersion: opts.notionVersion, rootPageId: opts.rootId })
+  if (kind.error) return { ok: false, error: kind.error }
+  if (kind.kind === 'page') return listChildDatabases({ tokenOrUrl: opts.tokenOrUrl, notionVersion: opts.notionVersion, rootPageId: opts.rootId })
+
+  const all: ChildDatabase[] = []
+  let cursor: string | undefined
+  try {
+    const client = createNotionClient(opts.tokenOrUrl, opts.notionVersion)
+    while (true) {
+      const q: any = await client.databases.query({ database_id: opts.rootId, page_size: 100, start_cursor: cursor })
+      for (const row of q.results ?? []) {
+        const r = await listChildDatabases({ tokenOrUrl: opts.tokenOrUrl, notionVersion: opts.notionVersion, rootPageId: row.id })
+        if (r.ok) all.push(...r.databases)
+      }
+      if (!q.has_more) break
+      cursor = q.next_cursor
+    }
+    return { ok: true, databases: all }
+  } catch (e) {
+    return { ok: false, error: notionErrorMessage(e, '读取根数据库失败') }
+  }
+}
+
+/**
+ * 确保业务子库存在（不存在则自动创建）：
+ * - 根是普通页面：直接在该页面下建/复用子库
+ * - 根是数据库：先按 author 定位/创建该用户的记录行，再在记录页下建/复用子库
+ */
 export async function ensureNotionDatabase(opts: {
   tokenOrUrl: string
   notionVersion: string
   rootPageId: string
   title: string
   properties: Record<string, unknown>
+  /** 数据库根模式下必填：作者/用户名，用于定位该用户的记录行 */
+  author?: string
 }): Promise<{ ok: true; databaseId: string } | { ok: false; error: string }> {
   const kind = await detectRootPageKind(opts)
   if (kind.error) return { ok: false, error: kind.error }
+  let hostPageId = opts.rootPageId
   if (kind.kind === 'database') {
-    return { ok: false, error: '根页面是数据库，Notion 不支持在数据库下自动创建子库；请粘贴一个普通页面的链接（如新建一个空页面）' }
+    if (!opts.author) return { ok: false, error: '根对象是数据库，请提供作者以定位记录行' }
+    const row = await resolveAuthorRow({ tokenOrUrl: opts.tokenOrUrl, notionVersion: opts.notionVersion, databaseId: opts.rootPageId, author: opts.author })
+    if (!row.ok) return row
+    hostPageId = row.rowPageId
   }
-  const list = await listChildDatabases(opts)
+  const list = await listChildDatabases({ tokenOrUrl: opts.tokenOrUrl, notionVersion: opts.notionVersion, rootPageId: hostPageId })
   if (!list.ok) return list
   const found = list.databases.find(d => d.title === opts.title)
   if (found) return { ok: true, databaseId: found.id }
   try {
     const client = createNotionClient(opts.tokenOrUrl, opts.notionVersion)
     const r: any = await client.databases.create({
-      parent: { type: 'page_id', page_id: opts.rootPageId },
+      parent: { type: 'page_id', page_id: hostPageId },
       title: [{ type: 'text', text: { content: opts.title } }],
       properties: opts.properties as any,
     })
