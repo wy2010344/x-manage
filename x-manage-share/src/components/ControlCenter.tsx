@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { Fab } from './Fab'
-import { XMANAGE_VERSION } from '../version'
 
 /** 控制中心的一个顶级功能 tab */
 export interface HubSection {
@@ -57,7 +56,6 @@ export function ControlCenter({ storage, sections, initialPos = { top: 100, left
                   {s.label}
                 </button>
               ))}
-              <span className="x-manage-hub-version" style={{ marginLeft: 'auto', fontSize: 11, color: '#a0a0a0', paddingRight: 8 }}>v{XMANAGE_VERSION}</span>
               <button className="x-manage-hub-close" onClick={() => setShowModal(false)} aria-label="关闭">✕</button>
             </div>
             <div className="x-manage-hub-body">

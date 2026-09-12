@@ -3,8 +3,8 @@ import { useState, useCallback } from 'react'
 import browser from 'webextension-polyfill'
 import { STYLES, ControlCenter, isSelfMutationBatch, Toast, NotionHubPanel, type NotionSyncModule } from 'x-manage-share'
 import { BlockSettingsPanel, processNewTweets, BLOCK_STYLES } from 'x-manage-lib-block'
-import { TagFeature, TagSettingsPanel, ensureTagButtons, updateTweetTags, TAG_STYLES, getAllTags, pushTagsUnpushed, restoreTags, NOTION_TAG_VERSION } from 'x-manage-lib-tag'
-import { FavSettingsPanel, ensureFavButtons, updateFavButtonStates, FAV_STYLES, getAllFavs, pushFavsUnpushed, restoreFavs, NOTION_FAV_VERSION, removeFav } from 'x-manage-lib-fav'
+import { TagFeature, TagSettingsPanel, ensureTagButtons, updateTweetTags, TAG_STYLES, getAllTags, pushTagsUnpushed, pushTagsFull, restoreTags, NOTION_TAG_VERSION } from 'x-manage-lib-tag'
+import { FavSettingsPanel, ensureFavButtons, updateFavButtonStates, FAV_STYLES, getAllFavs, pushFavsUnpushed, pushFavsFull, restoreFavs, NOTION_FAV_VERSION, removeFav } from 'x-manage-lib-fav'
 
 // popup 通过消息读写 content script 的收藏 IndexedDB（同一扩展内，popup 无法直连页面 origin 的 IDB）
 browser.runtime.onMessage.addListener((msg: any): any => {
@@ -34,6 +34,7 @@ const NOTION_MODULES: NotionSyncModule[] = [
     version: NOTION_TAG_VERSION,
     lastPushedKey: 'x-manage-tags-lastPushedAt',
     push: s => pushTagsUnpushed(s as Parameters<typeof pushTagsUnpushed>[0]),
+    pushAll: s => pushTagsFull(s as Parameters<typeof pushTagsFull>[0]),
     restore: s => restoreTags(s as Parameters<typeof restoreTags>[0]),
   },
   {
@@ -42,6 +43,7 @@ const NOTION_MODULES: NotionSyncModule[] = [
     version: NOTION_FAV_VERSION,
     lastPushedKey: 'x-manage-favs-lastPushedAt',
     push: s => pushFavsUnpushed(s as Parameters<typeof pushFavsUnpushed>[0]),
+    pushAll: s => pushFavsFull(s as Parameters<typeof pushFavsFull>[0]),
     restore: s => restoreFavs(s as Parameters<typeof restoreFavs>[0]),
   },
 ]

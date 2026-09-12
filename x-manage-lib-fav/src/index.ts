@@ -1,6 +1,6 @@
 export type { FavTweet, FavNotionSetup, FavStorage } from './types'
 export { getAllFavs, getFavsByAuthor, getFavByTweetId, isTweetFavorited, addFav, removeFav, removeFavByTweetId, deleteAllFavs, importFavs, toggleFav } from './favStore'
-export { pushFavsUnpushed, restoreFavs, NOTION_FAV_VERSION } from './notionSync'
+export { pushFavsUnpushed, pushFavsFull, restoreFavs, NOTION_FAV_VERSION } from './notionSync'
 export { ensureFavButtons, updateFavButtonStates, setFavButtonSelector, CLASS_FAV_BTN } from './fav'
 export { FavSettingsPanel } from './FavSettingsPanel'
 export { FavListPanel } from './FavListPanel'

@@ -71,12 +71,12 @@ export async function setFabPosition(pos: { top: number; left: number }): Promis
   try { GM_setValue(FAB_POS_KEY, JSON.stringify(pos)) } catch (err) { console.error('x-manage setFabPosition error:', err) }
 }
 
-export async function getNotionSetup(): Promise<{ proxyUrl: string; rootPageId: string } | null> {
+export async function getNotionSetup(): Promise<{ proxyUrl: string; rootPageId: string; rootPageUrl?: string; accountHandle?: string } | null> {
   try { return JSON.parse(GM_getValue(NOTION_SETUP_KEY, 'null')) }
   catch { return null }
 }
 
-export async function setNotionSetup(setup: { proxyUrl: string; rootPageId: string }): Promise<void> {
+export async function setNotionSetup(setup: { proxyUrl: string; rootPageId: string; rootPageUrl?: string; accountHandle?: string }): Promise<void> {
   try { GM_setValue(NOTION_SETUP_KEY, JSON.stringify(setup)) } catch (err) { console.error('x-manage setNotionSetup error:', err) }
 }
 
