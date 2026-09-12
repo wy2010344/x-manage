@@ -63,6 +63,11 @@ export function getCurrentUserHandle(): string | null {
     const switcherBtn = document.querySelector<HTMLElement>('[data-testid="SideNav_AccountSwitcher_Button"]')
     const atSpan = switcherBtn ? [...switcherBtn.querySelectorAll('span')].map(s => s.textContent || '').find(t => /^@[A-Za-z0-9_]{1,50}$/.test(t)) : ''
     if (atSpan) return `/${atSpan.slice(1)}`
+    const scopedAvatar = document.querySelector<HTMLElement>('header [data-testid^="UserAvatar-Container-"], nav [data-testid^="UserAvatar-Container-"]')
+    if (scopedAvatar) {
+      const id = (scopedAvatar.getAttribute('data-testid') || '').replace('UserAvatar-Container-', '')
+      if (/^[A-Za-z0-9_]{1,50}$/.test(id)) return `/${id}`
+    }
   } catch { /* 不在浏览器页面环境时静默失败 */ }
   return null
 }

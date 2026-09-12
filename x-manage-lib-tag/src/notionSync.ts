@@ -121,26 +121,26 @@ async function getSetup(storage: TagStorage) {
 }
 
 /**
- * 增量推送到 Notion：在登记账号记录页下建/复用固定 `标签` 子数据库。
- * 只推送 updatedAt > 上次推送时间的行；成功后更新游标。
- * 根为页面时直接在页面下建库；根为数据库时按当前登录账号定位/创建登记记录行。
+ * 推送到 Notion：在登记账号记录页下建/复用固定 `标签` 子数据库。
+ * 默认只推送 updatedAt > 上次推送时间的行（增量）；force 时全量推送全部本地行。
+ * 成功后更新游标。根为页面时直接在页面下建库；根为数据库时按当前登录账号定位/创建登记记录行。
  */
-export async function pushTagsUnpushed(storage: TagStorage): Promise<{ ok: boolean; pushed?: number; message?: string; error?: string }> {
+export async function pushTagsUnpushed(storage: TagStorage, opts?: { force?: boolean }): Promise<{ ok: boolean; pushed?: number; message?: string; error?: string }> {
   const setup = await getSetup(storage)
   if (!setup) return { ok: false, error: '未配置 Notion 同步' }
 
-  const last = readLastPushedAt(LAST_PUSHED_KEY)
+  const last = opts?.force ? 0 : readLastPushedAt(LAST_PUSHED_KEY)
   const all = await getAllTags().catch(() => [])
-  const pending = all.filter(t => t.updatedAt > last)
-  if (!pending.length) return { ok: true, message: '无需推送' }
+  const pending = opts?.force ? all : all.filter(t => t.updatedAt > last)
+  if (!pending.length) return { ok: true, message: opts?.force ? '本地无记录可推送' : '无需推送' }
 
-  const account = getCurrentUserHandle()
+  const account = setup.accountHandle || getCurrentUserHandle()
   const kind = await detectRootPageKind({ tokenOrUrl: setup.proxyUrl, notionVersion: NOTION_VERSION, rootPageId: setup.rootPageId })
   const isDatabaseRoot = kind.kind === 'database'
 
   let author: string | undefined
   if (isDatabaseRoot) {
-    if (!account) return { ok: false, error: '根对象是数据库，需要当前登录账号作为登记账号，但读取当前账号失败' }
+    if (!account) return { ok: false, error: '根对象是数据库，需要登记账号，但读取当前登录账号失败；请先在 Notion 面板「登记账号」一栏填写当前 X 账号 handle 后重试' }
     author = account
   }
 
@@ -162,17 +162,22 @@ export async function pushTagsUnpushed(storage: TagStorage): Promise<{ ok: boole
   return { ok: true, pushed: pending.length }
 }
 
+/** 全量推送：忽略游标，把本地全部标签 upsert 到 Notion（用于补推/历史数据修复） */
+export async function pushTagsFull(storage: TagStorage): Promise<{ ok: boolean; pushed?: number; message?: string; error?: string }> {
+  return pushTagsUnpushed(storage, { force: true })
+}
+
 /** 从 Notion 拉取登记账号记录页下的固定 `标签` 库并合并到本地（手动恢复用；根为数据库时定位登记账号行） */
 export async function restoreTags(storage: TagStorage): Promise<{ ok: boolean; count?: number; error?: string }> {
   const setup = await getSetup(storage)
   if (!setup) return { ok: false, error: '未配置 Notion 同步' }
 
-  const account = getCurrentUserHandle()
+  const account = setup.accountHandle || getCurrentUserHandle()
   let hostPageId = setup.rootPageId
   const kind = await detectRootPageKind({ tokenOrUrl: setup.proxyUrl, notionVersion: NOTION_VERSION, rootPageId: setup.rootPageId })
 
   if (kind.kind === 'database') {
-    if (!account) return { ok: false, error: '根对象是数据库，需要当前登录账号作为登记账号，但读取当前账号失败' }
+    if (!account) return { ok: false, error: '根对象是数据库，需要登记账号，但读取当前登录账号失败；请先在 Notion 面板「登记账号」一栏填写当前 X 账号 handle 后重试' }
     const row = await findAuthorRow({ tokenOrUrl: setup.proxyUrl, notionVersion: NOTION_VERSION, databaseId: setup.rootPageId, author: account })
     if (!row.ok) return { ok: false, error: row.error ?? '根数据库中未找到登记账号记录行' }
     hostPageId = row.rowPageId

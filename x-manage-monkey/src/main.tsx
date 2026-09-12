@@ -14,6 +14,7 @@ import {
   TAG_STYLES,
   getAllTags,
   pushTagsUnpushed,
+  pushTagsFull,
   restoreTags,
   NOTION_TAG_VERSION,
 } from 'x-manage-lib-tag'
@@ -24,6 +25,7 @@ import {
   FAV_STYLES,
   getAllFavs,
   pushFavsUnpushed,
+  pushFavsFull,
   restoreFavs,
   NOTION_FAV_VERSION,
 } from 'x-manage-lib-fav'
@@ -40,6 +42,7 @@ const NOTION_MODULES: NotionSyncModule[] = [
     version: NOTION_TAG_VERSION,
     lastPushedKey: 'x-manage-tags-lastPushedAt',
     push: s => pushTagsUnpushed(s as Parameters<typeof pushTagsUnpushed>[0]),
+    pushAll: s => pushTagsFull(s as Parameters<typeof pushTagsFull>[0]),
     restore: s => restoreTags(s as Parameters<typeof restoreTags>[0]),
   },
   {
@@ -48,6 +51,7 @@ const NOTION_MODULES: NotionSyncModule[] = [
     version: NOTION_FAV_VERSION,
     lastPushedKey: 'x-manage-favs-lastPushedAt',
     push: s => pushFavsUnpushed(s as Parameters<typeof pushFavsUnpushed>[0]),
+    pushAll: s => pushFavsFull(s as Parameters<typeof pushFavsFull>[0]),
     restore: s => restoreFavs(s as Parameters<typeof restoreFavs>[0]),
   },
 ]

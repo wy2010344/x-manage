@@ -149,14 +149,14 @@ export async function setXLinkConfig(config: { enabled: boolean; mode: 'iframe' 
   try { await browser.storage.local.set({ [XLINK_CONFIG_KEY]: config }) } catch (err) { console.error('x-manage setXLinkConfig error:', err) }
 }
 
-export async function getNotionSetup(): Promise<{ proxyUrl: string; rootPageId: string } | null> {
+export async function getNotionSetup(): Promise<{ proxyUrl: string; rootPageId: string; rootPageUrl?: string; accountHandle?: string } | null> {
   try {
     const result = await browser.storage.local.get(NOTION_CONFIG_KEY);
     return result[NOTION_CONFIG_KEY] || null;
   } catch { return null }
 }
 
-export async function setNotionSetup(setup: { proxyUrl: string; rootPageId: string }): Promise<void> {
+export async function setNotionSetup(setup: { proxyUrl: string; rootPageId: string; rootPageUrl?: string; accountHandle?: string }): Promise<void> {
   try { await browser.storage.local.set({ [NOTION_CONFIG_KEY]: setup }) } catch (err) { console.error('x-manage setNotionSetup error:', err) }
 }
 

@@ -164,6 +164,11 @@ export const STYLES = `
 .x-manage-btn-danger { background: rgba(255, 71, 87, 0.15) !important; color: var(--xm-danger-text) !important; }
 .x-manage-btn-danger:hover { background: rgba(255, 71, 87, 0.25) !important; }
 .x-manage-btn-sm { padding: 6px 12px !important; font-size: 12px !important; border-radius: 8px !important; }
+.x-manage-btn[disabled] { opacity: 0.65 !important; cursor: not-allowed !important; }
+.x-manage-btn:disabled:hover { transform: none !important; box-shadow: none !important; }
+.x-manage-spinner { display: inline-block !important; width: 12px !important; height: 12px !important; border: 2px solid rgba(255,255,255,0.35) !important; border-top-color: #fff !important; border-radius: 50% !important; animation: x-manage-spin 0.7s linear infinite !important; vertical-align: -2px !important; margin-right: 6px !important; }
+.x-manage-btn-secondary .x-manage-spinner { border-color: var(--xm-text-muted) !important; border-top-color: var(--xm-text) !important; }
+@keyframes x-manage-spin { to { transform: rotate(360deg); } }
 
 .x-manage-select { padding: 10px 14px !important; border: 1px solid var(--xm-border-strong) !important; border-radius: 10px !important; background: var(--xm-surface) !important; color: var(--xm-text) !important; font-size: 14px !important; font-family: inherit !important; outline: none !important; cursor: pointer !important; flex: 1 !important; transition: border-color 0.2s ease !important; color-scheme: var(--xm-scheme) !important; }
 .x-manage-select:focus { border-color: #6c5ce7 !important; }
