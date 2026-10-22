@@ -68,15 +68,12 @@ export const STYLES = `
   all: initial;
   position: fixed !important;
   z-index: 2147483647 !important;
-  width: 56px !important;
-  height: 56px !important;
-  border-radius: 50% !important;
-  border: none !important;
-  background: linear-gradient(135deg, #6c5ce7, #a855f7) !important;
-  color: #fff !important;
-  font-size: 24px !important;
+  border-radius: 14px !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  background: rgba(24, 26, 40, 0.82) !important;
+  color: rgba(255, 255, 255, 0.92) !important;
   cursor: grab !important;
-  box-shadow: 0 4px 20px rgba(108, 92, 231, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.28), 0 1px 3px rgba(0, 0, 0, 0.18) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -84,17 +81,24 @@ export const STYLES = `
   user-select: none !important;
   -webkit-user-select: none !important;
   outline: none !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
+  backdrop-filter: blur(14px) saturate(1.4) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(1.4) !important;
   overflow: hidden !important;
   touch-action: none !important;
+  box-sizing: border-box !important;
+  transition: box-shadow 0.2s ease, background-color 0.2s ease, width 0.2s ease, height 0.2s ease, top 0.2s ease, left 0.2s ease, border-radius 0.2s ease !important;
+}
+#x-manage-fab:hover {
+  background: rgba(34, 37, 56, 0.9) !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.22) !important;
 }
 #x-manage-fab.dragging {
   cursor: grabbing !important;
-  box-shadow: 0 8px 32px rgba(108, 92, 231, 0.6), 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+  background: rgba(24, 26, 40, 0.9) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4) !important;
   transition: none !important;
 }
-#x-manage-fab:active { transform: scale(0.92) !important; }
+#x-manage-fab:active { filter: brightness(1.3) !important; }
 
 .x-manage-modal-backdrop {
   position: fixed !important; inset: 0 !important; z-index: 2147483646 !important;
