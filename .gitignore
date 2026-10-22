@@ -1,0 +1,11 @@
+# 本地调试脚本：含登录凭据，禁止提交
+paste-cookie.js
+
+# 环境变量与本地配置
+.env
+.env.local
+*.local
+
+# 构建产物与依赖
+node_modules/
+dist/
